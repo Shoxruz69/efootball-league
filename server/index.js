@@ -42,7 +42,7 @@ const server = http.createServer(app);
 initWebSocket(server);
 
 // Ensure uploads folder exists
-const uploadsPath = path.join(__dirname, '..', config.uploadDir);
+const uploadsPath = config.uploadDir;
 if (!fs.existsSync(uploadsPath)) {
   fs.mkdirSync(uploadsPath, { recursive: true });
 }
@@ -67,6 +67,14 @@ app.use(express.static(path.join(__dirname, '..', 'public'), {
 app.use('/uploads', express.static(uploadsPath, {
   maxAge: '7d'
 }));
+
+// Fallback: Also serve from server/uploads legacy folder if files exist
+const legacyUploadsPath = path.resolve(__dirname, 'uploads');
+if (fs.existsSync(legacyUploadsPath)) {
+  app.use('/uploads', express.static(legacyUploadsPath, {
+    maxAge: '7d'
+  }));
+}
 
 // Auth Middleware for all API routes
 app.use('/api', authMiddleware);
@@ -184,6 +192,11 @@ app.get('/api/health/ping', (req, res) => {
 // Dedicated Web Admin Panel page
 app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'admin.html'));
+});
+
+// 404 for missing static uploads or API routes (prevents returning HTML for missing images)
+app.use(['/uploads', '/api'], (req, res) => {
+  res.status(404).json({ success: false, error: 'Fayl yoki endpoint topilmadi' });
 });
 
 // Fallback route for SPA

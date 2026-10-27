@@ -352,15 +352,13 @@ const ProfileView = {
 
             <div class="round-match-content">
               <div class="round-match-team" style="text-align: right;">
-                <div style="color: var(--white);">${this.escape(m.home_player_name || 'Mezbon')}</div>
-                <div style="font-size: 11px; color: var(--muted); font-weight: 400;">${this.escape(m.home_team || '')}</div>
+                <div style="color: var(--white); font-weight: 600;">${this.escape(m.home_player_name || 'Mezbon')}</div>
               </div>
 
               <div class="round-match-score">${scoreText}</div>
 
               <div class="round-match-team" style="text-align: left;">
-                <div style="color: var(--white);">${this.escape(m.away_player_name || 'Mehmon')}</div>
-                <div style="font-size: 11px; color: var(--muted); font-weight: 400;">${this.escape(m.away_team || '')}</div>
+                <div style="color: var(--white); font-weight: 600;">${this.escape(m.away_player_name || 'Mehmon')}</div>
               </div>
             </div>
 
@@ -423,7 +421,7 @@ const ProfileView = {
             </div>
             <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px;">
               <span style="color: #ffbb00; display: inline-flex; align-items: center; gap: 4px;">
-                🏆 Chempion: <b>${this.escape(a.winner_name || 'Noma\'lum')}</b> ${a.winner_club ? `(${this.escape(a.winner_club)})` : ''}
+                🏆 Chempion: <b>${this.escape(a.winner_name || 'Noma\'lum')}</b>
               </span>
               <span style="color: var(--cyan); font-weight: 600;">Jadval ></span>
             </div>
@@ -449,7 +447,10 @@ const ProfileView = {
       const archive = data.archive;
       if (!archive) return;
 
-      const standings = Array.isArray(archive.standings) ? archive.standings : [];
+      const rawStandings = Array.isArray(archive.standings) ? archive.standings : [];
+      // Only keep real, non-empty archived participants
+      const standings = rawStandings.filter(s => s && s.player_name && String(s.player_name).trim().length > 0);
+
       const currentUser = window.App?.currentUser;
       const myTgId = String(currentUser?.telegram_id || window.TelegramService?.getUser()?.id || '');
       const myName = currentUser?.player_name;
@@ -462,88 +463,86 @@ const ProfileView = {
 
       const tableRows = standings.map((s, idx) => {
         const isMe = (myTgId && String(s.telegram_id) === myTgId) || (myName && s.player_name && s.player_name.toLowerCase() === myName.toLowerCase());
-        const rowBg = isMe ? 'background: rgba(25, 201, 255, 0.15); font-weight: 700;' : '';
-        const rankColor = idx === 0 ? 'color: #ffbb00; font-weight: 700;' : (idx === 1 ? 'color: #c0c0c0;' : (idx === 2 ? 'color: #cd7f32;' : ''));
+        const rowBg = isMe ? 'background: rgba(25, 201, 255, 0.16);' : (idx % 2 === 1 ? 'background: rgba(255, 255, 255, 0.02);' : '');
+        const rankColor = idx === 0 ? 'color: #ffbb00; font-weight: 700;' : (idx === 1 ? 'color: #c0c0c0; font-weight: 700;' : (idx === 2 ? 'color: #cd7f32; font-weight: 700;' : 'color: var(--muted);'));
 
         return `
           <tr style="border-bottom: 1px solid rgba(255,255,255,0.06); ${rowBg}">
-            <td style="padding: 8px 4px; text-align: center; ${rankColor}">#${idx + 1}</td>
-            <td style="padding: 8px 6px; text-align: left; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-              <span style="color: ${isMe ? 'var(--cyan)' : 'var(--white)'};">${this.escape(s.player_name)}</span>
-              ${s.team ? `<div style="font-size: 10px; color: var(--muted);">${this.escape(s.team)}</div>` : ''}
+            <td style="padding: 10px 4px; text-align: center; ${rankColor}">#${idx + 1}</td>
+            <td style="padding: 10px 6px; text-align: left; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+              <span style="color: ${isMe ? 'var(--cyan)' : '#ffffff'}; font-weight: ${isMe ? '700' : '600'}; font-size: 13px;">${this.escape(s.player_name)}</span>
             </td>
-            <td style="padding: 8px 4px; text-align: center; color: var(--muted);">${s.played || (s.won + s.drawn + s.lost)}</td>
-            <td style="padding: 8px 4px; text-align: center; color: var(--win);">${s.won}</td>
-            <td style="padding: 8px 4px; text-align: center; color: var(--draw);">${s.drawn}</td>
-            <td style="padding: 8px 4px; text-align: center; color: var(--loss);">${s.lost}</td>
-            <td style="padding: 8px 4px; text-align: center; color: var(--muted);">${s.goals_for}:${s.goals_against}</td>
-            <td style="padding: 8px 6px; text-align: center; font-weight: 700; color: #ffffff;">${s.points}</td>
+            <td style="padding: 10px 4px; text-align: center; color: var(--muted); font-size: 12.5px;">${s.played || (s.won + s.drawn + s.lost) || 0}</td>
+            <td style="padding: 10px 4px; text-align: center; color: var(--win); font-weight: 600; font-size: 12.5px;">${s.won || 0}</td>
+            <td style="padding: 10px 4px; text-align: center; color: var(--draw); font-size: 12.5px;">${s.drawn || 0}</td>
+            <td style="padding: 10px 4px; text-align: center; color: var(--loss); font-size: 12.5px;">${s.lost || 0}</td>
+            <td style="padding: 10px 4px; text-align: center; color: var(--muted); font-size: 12px;">${s.goals_for || 0}:${s.goals_against || 0}</td>
+            <td style="padding: 10px 6px; text-align: center; font-weight: 700; color: #ffffff; font-size: 13.5px;">${s.points || 0}</td>
           </tr>
         `;
       }).join('');
 
       const modalHtml = `
         <div class="modal-overlay" id="seasonArchiveModal" onclick="if(event.target===this) ProfileView.closeModal('seasonArchiveModal')">
-          <div class="modal-dialog" style="max-width: 440px; padding: 20px 16px;">
+          <div class="modal-dialog dark-modal-dialog" style="max-width: 440px; width: 92%; padding: 20px 16px; background: #16161c; border: 1px solid rgba(255, 255, 255, 0.12); color: #ffffff; border-radius: 18px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8);">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px;">
               <div>
                 <span style="font-size: 11px; color: var(--cyan); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Arxiv Mavsum</span>
-                <h3 style="font-size: 18px; color: var(--white); margin: 2px 0;">${this.escape(archive.league_name)}</h3>
-                <div style="font-size: 12px; color: var(--muted);">Tugallangan: ${archive.completed_at ? new Date(archive.completed_at).toLocaleDateString('uz-UZ') : ''}</div>
+                <h3 style="font-size: 18px; color: #ffffff; margin: 2px 0 0;">${this.escape(archive.league_name)}</h3>
+                <div style="font-size: 12px; color: var(--muted); margin-top: 2px;">Tugallangan: ${archive.completed_at ? new Date(archive.completed_at).toLocaleDateString('uz-UZ') : ''}</div>
               </div>
               <button 
                 onclick="ProfileView.closeModal('seasonArchiveModal')" 
-                style="background: rgba(255,255,255,0.08); border: none; color: var(--muted); width: 28px; height: 28px; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center;"
+                style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); color: var(--muted); width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center;"
                 type="button"
               >
                 ✕
               </button>
             </div>
 
-            <!-- Winner Highlight -->
-            <div style="background: rgba(255, 187, 0, 0.08); border: 1px solid rgba(255, 187, 0, 0.25); border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; display: flex; align-items: center; gap: 10px;">
-              <span style="font-size: 24px;">🏆</span>
+            <!-- Winner Highlight (Only player nickname, no club) -->
+            <div style="background: rgba(255, 187, 0, 0.08); border: 1px solid rgba(255, 187, 0, 0.25); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; display: flex; align-items: center; gap: 12px; text-align: left;">
+              <span style="font-size: 28px;">🏆</span>
               <div>
-                <div style="font-size: 11px; color: #ffbb00; font-weight: 700; text-transform: uppercase;">Mavsum Chempioni</div>
-                <div style="font-size: 15px; font-weight: 700; color: #ffffff;">${this.escape(archive.winner_name || 'Noma\'lum')}</div>
-                ${archive.winner_club ? `<div style="font-size: 11.5px; color: var(--muted);">${this.escape(archive.winner_club)}</div>` : ''}
+                <div style="font-size: 11px; color: #ffbb00; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Mavsum Chempioni</div>
+                <div style="font-size: 16px; font-weight: 700; color: #ffffff; margin-top: 2px;">${this.escape(archive.winner_name || 'Noma\'lum')}</div>
               </div>
             </div>
 
             ${myArchivedStat ? `
               <!-- User Performance in this season -->
-              <div style="background: rgba(25, 201, 255, 0.08); border: 1px solid rgba(25, 201, 255, 0.25); border-radius: 10px; padding: 10px 14px; margin-bottom: 14px;">
-                <div style="font-size: 11px; color: var(--cyan); font-weight: 700; text-transform: uppercase;">Sizning ushbu mavsumdagi natijangiz:</div>
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px; font-size: 13.5px; font-weight: 600; color: #ffffff;">
-                  <span>O'rin: <b>#${standings.indexOf(myArchivedStat) + 1}</b></span>
-                  <span>Ochko: <b>${myArchivedStat.points}</b></span>
-                  <span>G': <b style="color:var(--win);">${myArchivedStat.won}</b> D: <b style="color:var(--draw);">${myArchivedStat.drawn}</b> M: <b style="color:var(--loss);">${myArchivedStat.lost}</b></span>
+              <div style="background: rgba(25, 201, 255, 0.08); border: 1px solid rgba(25, 201, 255, 0.25); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; text-align: left;">
+                <div style="font-size: 11px; color: var(--cyan); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Sizning ushbu mavsumdagi natijangiz:</div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 13.5px; font-weight: 600; color: #ffffff;">
+                  <span>O'rin: <b style="color: var(--cyan);">#${standings.indexOf(myArchivedStat) + 1}</b></span>
+                  <span>Ochko: <b>${myArchivedStat.points || 0}</b></span>
+                  <span>G': <b style="color:var(--win);">${myArchivedStat.won || 0}</b> D: <b style="color:var(--draw);">${myArchivedStat.drawn || 0}</b> M: <b style="color:var(--loss);">${myArchivedStat.lost || 0}</b></span>
                 </div>
               </div>
             ` : ''}
 
             <!-- Standings Table -->
-            <div style="overflow-x: auto; margin-bottom: 16px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+            <div style="overflow-x: auto; margin-bottom: 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.25);">
               <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
                 <thead>
-                  <tr style="background: rgba(255,255,255,0.06); color: var(--muted); text-transform: uppercase; font-size: 10px;">
-                    <th style="padding: 6px 4px; text-align: center;">#</th>
-                    <th style="padding: 6px 6px; text-align: left;">O'yinchi</th>
-                    <th style="padding: 6px 4px; text-align: center;">O'</th>
-                    <th style="padding: 6px 4px; text-align: center;">G'</th>
-                    <th style="padding: 6px 4px; text-align: center;">D</th>
-                    <th style="padding: 6px 4px; text-align: center;">M</th>
-                    <th style="padding: 6px 4px; text-align: center;">Gol</th>
-                    <th style="padding: 6px 6px; text-align: center;">Ochko</th>
+                  <tr style="background: rgba(255,255,255,0.06); color: var(--muted); text-transform: uppercase; font-size: 10.5px; letter-spacing: 0.3px;">
+                    <th style="padding: 8px 4px; text-align: center;">#</th>
+                    <th style="padding: 8px 6px; text-align: left;">O'yinchi</th>
+                    <th style="padding: 8px 4px; text-align: center;">O'</th>
+                    <th style="padding: 8px 4px; text-align: center;">G'</th>
+                    <th style="padding: 8px 4px; text-align: center;">D</th>
+                    <th style="padding: 8px 4px; text-align: center;">M</th>
+                    <th style="padding: 8px 4px; text-align: center;">Gol</th>
+                    <th style="padding: 8px 6px; text-align: center;">Ochko</th>
                   </tr>
                 </thead>
                 <tbody>
-                  ${tableRows || '<tr><td colspan="8" style="padding: 12px; text-align: center; color: var(--muted);">Jadval ma\'lumoti mavjud emas</td></tr>'}
+                  ${tableRows || '<tr><td colspan="8" style="padding: 16px; text-align: center; color: var(--muted);">Jadval ma\'lumoti mavjud emas</td></tr>'}
                 </tbody>
               </table>
             </div>
 
-            <button class="pill on" onclick="ProfileView.closeModal('seasonArchiveModal')" type="button" style="width: 100%;">
+            <button class="pill on" onclick="ProfileView.closeModal('seasonArchiveModal')" type="button" style="width: 100%; min-height: 44px; font-size: 14px; font-weight: 600;">
               Yopish
             </button>
           </div>
@@ -563,36 +562,43 @@ const ProfileView = {
 
     const modalHtml = `
       <div class="modal-overlay" id="screenshotPreviewModal" onclick="if(event.target===this) ProfileView.closeModal('screenshotPreviewModal')">
-        <div class="modal-dialog" style="max-width: 420px; padding: 16px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-            <div style="font-size: 14px; font-weight: 700; color: #ffffff;">${this.escape(title)}</div>
+        <div class="modal-dialog dark-modal-dialog" style="max-width: 440px; width: 92%; padding: 18px 16px; background: #16161c; border: 1px solid rgba(255, 255, 255, 0.12); color: #ffffff; border-radius: 18px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; text-align: left;">
+            <div>
+              <span style="font-size: 11px; color: var(--cyan); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">O'yin skrinshoti</span>
+              <h3 style="font-size: 15px; font-weight: 700; color: #ffffff; margin: 2px 0 0;">${this.escape(title)}</h3>
+            </div>
             <button 
               onclick="ProfileView.closeModal('screenshotPreviewModal')" 
-              style="background: rgba(255,255,255,0.08); border: none; color: var(--muted); width: 28px; height: 28px; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center;"
+              style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); color: var(--muted); width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center;"
               type="button"
             >
               ✕
             </button>
           </div>
 
-          <div style="border-radius: 10px; overflow: hidden; background: #000; border: 1px solid rgba(255,255,255,0.1); margin-bottom: 14px;">
-            <img src="${this.escape(imageUrl)}" style="width: 100%; max-height: 440px; object-fit: contain; display: block;" alt="Skrinshot" />
+          <div style="border-radius: 12px; overflow: hidden; background: #000000; border: 1px solid rgba(255,255,255,0.1); margin-bottom: 14px; display: flex; align-items: center; justify-content: center; min-height: 200px; max-height: 68vh;">
+            <img 
+              src="${this.escape(imageUrl)}" 
+              style="width: 100%; height: auto; max-height: 65vh; object-fit: contain; display: block; border-radius: 10px;" 
+              alt="O'yin skrinshoti" 
+              onload="this.style.display='block'; var err = document.getElementById('screenshotErrorBox'); if(err) err.style.display='none';"
+              onerror="this.style.display='none'; var err = document.getElementById('screenshotErrorBox'); if(err) err.style.display='flex';"
+            />
+            <div id="screenshotErrorBox" style="display: none; flex-direction: column; align-items: center; justify-content: center; padding: 36px 16px; text-align: center; gap: 8px;">
+              <svg class="i" viewBox="0 0 24 24" style="width: 36px; height: 36px; color: var(--loss);">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              <div style="font-size: 14px; font-weight: 700; color: #ffffff;">Skrinshot yuklanmadi</div>
+              <div style="font-size: 12px; color: var(--muted); line-height: 1.4; max-width: 260px;">Ushbu o'yin skrinshoti serverda topilmadi yoki yuklashda xatolik yuz berdi.</div>
+            </div>
           </div>
 
-          <div style="display: flex; gap: 8px;">
-            <a 
-              href="${this.escape(imageUrl)}" 
-              target="_blank" 
-              rel="noopener noreferrer" 
-              class="pill" 
-              style="flex: 1; text-align: center; text-decoration: none; display: flex; align-items: center; justify-content: center; font-size: 13px;"
-            >
-              Asl hajmini ochish ↗
-            </a>
-            <button class="pill on" onclick="ProfileView.closeModal('screenshotPreviewModal')" type="button" style="flex: 1;">
-              Yopish
-            </button>
-          </div>
+          <button class="pill on" onclick="ProfileView.closeModal('screenshotPreviewModal')" type="button" style="width: 100%; min-height: 44px; font-size: 14px; font-weight: 600;">
+            Yopish
+          </button>
         </div>
       </div>
     `;

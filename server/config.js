@@ -1,3 +1,4 @@
+const path = require('path');
 require('dotenv').config();
 
 const adminIdsRaw = process.env.ADMIN_TELEGRAM_IDS || process.env.ADMIN_ID || '123456789';
@@ -12,5 +13,5 @@ module.exports = {
   miniAppUrl: process.env.MINI_APP_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:3000',
   ngrokAuthToken: process.env.NGROK_AUTHTOKEN || process.env.NGROK_AUTH_TOKEN || '',
   geminiApiKey: process.env.GEMINI_API_KEY || '',
-  uploadDir: process.env.UPLOAD_DIR || 'uploads'
+  uploadDir: path.resolve(__dirname, '..', process.env.UPLOAD_DIR || 'uploads')
 };

@@ -11,7 +11,7 @@ const { notifyOpponentOfResult, notifyResultConfirmed } = require('../services/b
 const { checkRoundLocked, checkAndAdvanceRound } = require('../services/roundManager');
 
 // Setup multer for screenshot uploads
-const uploadDir = path.join(__dirname, '..', config.uploadDir);
+const uploadDir = config.uploadDir;
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }

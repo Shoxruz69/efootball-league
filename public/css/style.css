@@ -950,6 +950,24 @@ svg.i {
   animation: dialogScaleIn 240ms cubic-bezier(0.18, 0.89, 0.32, 1.15) both;
 }
 
+.modal-dialog.dark-modal-dialog,
+.dark-modal-dialog {
+  background: #16161c !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8) !important;
+}
+
+.modal-dialog.dark-modal-dialog h3,
+.dark-modal-dialog h3 {
+  color: #ffffff !important;
+}
+
+.modal-dialog.dark-modal-dialog p,
+.dark-modal-dialog p {
+  color: var(--muted) !important;
+}
+
 .modal-overlay.closing .modal-dialog {
   animation: dialogScaleOut 180ms ease-in both;
 }
