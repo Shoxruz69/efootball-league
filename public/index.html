@@ -14,41 +14,60 @@
   <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <!-- Stylesheets with Cache Busting -->
-  <link rel="stylesheet" href="css/style.css?v=20261027_05">
-  <link rel="stylesheet" href="css/animations.css?v=20261027_05">
+  <link rel="stylesheet" href="css/style.css?v=20261027_06">
+  <link rel="stylesheet" href="css/animations.css?v=20261027_06">
 
   <style>
-    /* Phone / Portrait default */
+    /* Pure Solid Black Background (#000000) - No Neon Image */
     html, body {
-      background-color: #050508 !important;
-      background-image: url('assets/neon-bg-mobile.png') !important;
-      background-size: cover !important;
-      background-position: center top !important;
-      background-repeat: no-repeat !important;
-      background-attachment: fixed !important;
+      background-color: #000000 !important;
+      background-image: none !important;
+      background: #000000 !important;
       color: #ffffff;
     }
     .app-container {
-      background-color: #050508 !important;
-      background-image: url('assets/neon-bg-mobile.png') !important;
-      background-size: cover !important;
-      background-position: center top !important;
-      background-repeat: no-repeat !important;
+      background-color: #000000 !important;
+      background-image: none !important;
+      background: #000000 !important;
     }
 
-    /* Laptop / Desktop Landscape */
     @media (min-width: 600px) {
       html, body {
-        background-image: url('assets/neon-bg.png') !important;
-        background-size: cover !important;
-        background-position: center center !important;
+        background-color: #000000 !important;
+        background-image: none !important;
+        background: #000000 !important;
       }
       .app-container {
-        background: transparent !important;
+        background-color: #000000 !important;
+        background-image: none !important;
+        background: #000000 !important;
       }
     }
 
-    /* Bottom Navigation Bar: transparent with neon background continuing behind it */
+    /* Cards in Natija & Profil: Exactly matching Jadval's dark card styling */
+    .state-box,
+    .white-card {
+      background: #1c1c22 !important;
+      border-radius: 14px !important;
+      border: 1px solid rgba(255, 255, 255, 0.06) !important;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35) !important;
+      color: #ffffff !important;
+    }
+    .state-box svg.i {
+      color: #19c9ff !important;
+    }
+    .state-box h3,
+    .white-card b,
+    .white-card b.big,
+    .white-card b.sub-big {
+      color: #ffffff !important;
+    }
+    .state-box p,
+    .white-card small {
+      color: #8b8b96 !important;
+    }
+
+    /* Bottom Navigation Bar: transparent with solid black background continuing behind it */
     .bottom-nav-bar {
       background: transparent !important;
       border-top: none !important;

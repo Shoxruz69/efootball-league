@@ -60,12 +60,9 @@
 html, body {
   height: 100%;
   width: 100%;
-  background-color: #050508;
-  background-image: url('../assets/neon-bg-mobile.png');
-  background-size: cover;
-  background-position: center top;
-  background-repeat: no-repeat;
-  background-attachment: fixed;
+  background-color: #000000;
+  background-image: none;
+  background: #000000;
   font-family: var(--font-family);
   color: #ffffff;
   font-size: 14px;
@@ -106,22 +103,22 @@ body {
   flex-direction: column;
   position: relative;
   overflow: hidden;
-  background-color: #050508;
-  background-image: url('../assets/neon-bg-mobile.png');
-  background-size: cover;
-  background-position: center top;
-  background-repeat: no-repeat;
+  background-color: #000000;
+  background-image: none;
+  background: #000000;
 }
 
 /* Laptop / Desktop widescreen view */
 @media (min-width: 600px) {
   html, body {
-    background-image: url('../assets/neon-bg.png');
-    background-size: cover;
-    background-position: center center;
+    background-color: #000000;
+    background-image: none;
+    background: #000000;
   }
   .app-container {
-    background: transparent;
+    background-color: #000000;
+    background-image: none;
+    background: #000000;
   }
 }
 
@@ -766,21 +763,22 @@ svg.i {
   display: flex;
   align-items: center;
   gap: 14px;
-  background: var(--white);
+  background: var(--card-dark);
   border-radius: 14px;
   padding: 14px 16px;
   margin-bottom: 12px;
   font-size: 17px;
   font-weight: 500;
-  box-shadow: var(--card-shadow);
-  color: var(--text);
+  box-shadow: var(--table-shadow);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: var(--white);
   transition: transform 120ms ease;
 }
 
 .white-card small {
   display: block;
   font-size: 10.5px;
-  color: var(--text-secondary);
+  color: var(--muted);
   font-weight: 600;
   letter-spacing: 0.5px;
   margin-bottom: 2px;
@@ -789,17 +787,19 @@ svg.i {
 
 .white-card b {
   font-weight: 700;
-  color: var(--text);
+  color: var(--white);
 }
 
 .white-card b.big {
   font-size: 24px;
   font-weight: 700;
   letter-spacing: -0.3px;
+  color: var(--white);
 }
 
 .white-card b.sub-big {
   font-size: 19px;
+  color: var(--white);
 }
 
 .grid-2col {
@@ -1136,31 +1136,32 @@ svg.i {
 
 /* Empty & Error States */
 .state-box {
-  background: var(--white);
-  border-radius: 16px;
+  background: var(--card-dark);
+  border-radius: 14px;
   padding: 32px 20px;
   text-align: center;
-  box-shadow: var(--card-shadow);
+  box-shadow: var(--table-shadow);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   margin-top: 12px;
 }
 
 .state-box svg.i {
   width: 44px;
   height: 44px;
-  color: var(--blue);
+  color: var(--cyan);
   margin-bottom: 10px;
 }
 
 .state-box h3 {
   font-size: 17px;
   font-weight: 700;
-  color: var(--text);
+  color: var(--white);
   margin-bottom: 6px;
 }
 
 .state-box p {
   font-size: 13px;
-  color: var(--text-secondary);
+  color: var(--muted);
   line-height: 1.5;
   margin-bottom: 16px;
 }
