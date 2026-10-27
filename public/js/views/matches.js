@@ -435,45 +435,7 @@ const MatchesView = {
               </div>
             </div>
 
-            <!-- 3. Gollar statistikasi (Zarbalar va to'p nazorati) -->
-            <details style="margin-bottom: 12px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 8px 12px; text-align: left;">
-              <summary style="font-size: 12px; font-weight: 600; color: #ffffff; cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center;">
-                <span>Gollar va o‘yin statistikasi</span>
-                <span style="font-size: 11px; color: var(--cyan);">Ochish ▾</span>
-              </summary>
-              <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                  <div>
-                    <label style="font-size: 10.5px; color: var(--muted);">${this.escape(match.home_player_name)} to‘p nazorati (%):</label>
-                    <input type="number" id="adminHomePossession" class="form-control" min="0" max="100" value="${match.stats?.possession ? match.stats.possession[0] : 50}" style="background: #0d0d12; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 6px 8px; border-radius: 6px;" />
-                  </div>
-                  <div>
-                    <label style="font-size: 10.5px; color: var(--muted);">${this.escape(match.away_player_name)} to‘p nazorati (%):</label>
-                    <input type="number" id="adminAwayPossession" class="form-control" min="0" max="100" value="${match.stats?.possession ? match.stats.possession[1] : 50}" style="background: #0d0d12; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 6px 8px; border-radius: 6px;" />
-                  </div>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                  <div>
-                    <label style="font-size: 10.5px; color: var(--muted);">${this.escape(match.home_player_name)} zarbalari:</label>
-                    <input type="number" id="adminHomeShots" class="form-control" min="0" max="99" value="${match.stats?.shots ? match.stats.shots[0] : ''}" placeholder="0" style="background: #0d0d12; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 6px 8px; border-radius: 6px;" />
-                  </div>
-                  <div>
-                    <label style="font-size: 10.5px; color: var(--muted);">${this.escape(match.away_player_name)} zarbalari:</label>
-                    <input type="number" id="adminAwayShots" class="form-control" min="0" max="99" value="${match.stats?.shots ? match.stats.shots[1] : ''}" placeholder="0" style="background: #0d0d12; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 6px 8px; border-radius: 6px;" />
-                  </div>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                  <div>
-                    <label style="font-size: 10.5px; color: var(--muted);">${this.escape(match.home_player_name)} aniq zarbalari:</label>
-                    <input type="number" id="adminHomeOnTarget" class="form-control" min="0" max="99" value="${match.stats?.shotsOnTarget ? match.stats.shotsOnTarget[0] : ''}" placeholder="0" style="background: #0d0d12; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 6px 8px; border-radius: 6px;" />
-                  </div>
-                  <div>
-                    <label style="font-size: 10.5px; color: var(--muted);">${this.escape(match.away_player_name)} aniq zarbalari:</label>
-                    <input type="number" id="adminAwayOnTarget" class="form-control" min="0" max="99" value="${match.stats?.shotsOnTarget ? match.stats.shotsOnTarget[1] : ''}" placeholder="0" style="background: #0d0d12; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 6px 8px; border-radius: 6px;" />
-                  </div>
-                </div>
-              </div>
-            </details>
+
 
             <!-- 4. Uchrashuv holati (Status) -->
             <div class="form-group" style="margin-bottom: 14px; text-align: left;">
@@ -859,34 +821,14 @@ const MatchesView = {
         if (uploadRes && uploadRes.screenshotUrl) {
           screenshotUrl = uploadRes.screenshotUrl;
         }
-      }
-
-      // 2. Package optional stats
-      let stats = null;
-      const hPoss = parseInt(document.getElementById('adminHomePossession')?.value, 10);
-      const aPoss = parseInt(document.getElementById('adminAwayPossession')?.value, 10);
-      const hShots = parseInt(document.getElementById('adminHomeShots')?.value, 10);
-      const aShots = parseInt(document.getElementById('adminAwayShots')?.value, 10);
-      const hOnTarget = parseInt(document.getElementById('adminHomeOnTarget')?.value, 10);
-      const aOnTarget = parseInt(document.getElementById('adminAwayOnTarget')?.value, 10);
-
-      if (!isNaN(hPoss) || !isNaN(hShots) || !isNaN(hOnTarget)) {
-        stats = {
-          possession: [isNaN(hPoss) ? 50 : hPoss, isNaN(aPoss) ? 50 : aPoss],
-          shots: [isNaN(hShots) ? 0 : hShots, isNaN(aShots) ? 0 : aShots],
-          shotsOnTarget: [isNaN(hOnTarget) ? 0 : hOnTarget, isNaN(aOnTarget) ? 0 : aOnTarget]
-        };
-      }
-
       if (saveBtn) saveBtn.textContent = 'Baza yangilanmoqda...';
 
-      // 3. Save directly via verified Admin API
+      // 2. Save directly via verified Admin API
       await API.adminUpdateMatchScore(matchId, {
         home_score: homeScore,
         away_score: awayScore,
         status,
-        screenshot_url: screenshotUrl,
-        stats
+        screenshot_url: screenshotUrl
       });
 
       try { window.TelegramService?.haptic('success'); } catch (e) {}

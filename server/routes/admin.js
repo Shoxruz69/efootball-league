@@ -463,18 +463,32 @@ router.put('/matches/:id', async (req, res) => {
       statsJson = typeof stats === 'string' ? stats : JSON.stringify(stats);
     }
 
+    const submitterTg = String(req.telegramUser?.id || '');
+    const isSubmitterHome = String(match.home_tg) === submitterTg;
+    const isSubmitterAway = String(match.away_tg) === submitterTg;
+
     // Confirmation flags:
-    // If 'submitted': both confirmations are 0 to require dual verification from both players!
-    // If 'finished': admin explicitly finalized it, so both are 1.
-    // Otherwise keep current.
+    // If 'finished': explicitly finalized, so both are 1.
+    // If 'submitted':
+    //   - If the submitter is Home player: Home is confirmed (1), Away is pending (0).
+    //   - If the submitter is Away player: Away is confirmed (1), Home is pending (0).
+    //   - If 3rd party admin: both are 0 until confirmed.
     let homeConfirmed = 0;
     let awayConfirmed = 0;
     if (s === 'finished') {
       homeConfirmed = 1;
       awayConfirmed = 1;
     } else if (s === 'submitted') {
-      homeConfirmed = 0;
-      awayConfirmed = 0;
+      if (isSubmitterHome) {
+        homeConfirmed = 1;
+        awayConfirmed = 0;
+      } else if (isSubmitterAway) {
+        homeConfirmed = 0;
+        awayConfirmed = 1;
+      } else {
+        homeConfirmed = 0;
+        awayConfirmed = 0;
+      }
     } else {
       homeConfirmed = match.home_confirmed;
       awayConfirmed = match.away_confirmed;
@@ -494,12 +508,12 @@ router.put('/matches/:id', async (req, res) => {
       WHERE id = ?
     `).run(h, a, s, scUrl, statsJson, homeConfirmed, awayConfirmed, matchId);
 
-    // If submitted, notify BOTH players via Telegram Bot with confirmation request
+    // If submitted, notify ONLY opponent (exclude submitter from receiving bot message)
     if (s === 'submitted' && h !== null && a !== null) {
       try {
         const { notifyAdminSubmissionForConfirmation } = require('../services/botNotifier');
         const scoreText = `${h} - ${a}`;
-        await notifyAdminSubmissionForConfirmation(match, scoreText, scUrl);
+        await notifyAdminSubmissionForConfirmation(match, scoreText, scUrl, submitterTg);
       } catch (err) {
         console.warn('Bot confirmation notification warning:', err.message);
       }

@@ -80,46 +80,46 @@ async function sendTelegramPhoto(telegramId, photoUrlOrPath, caption, replyMarku
 }
 
 /**
- * Notify both players when a result is submitted
+ * Notify ONLY the opponent when a result is submitted.
+ * The submitter's Telegram ID is strictly excluded from recipients.
  */
 async function notifyBothPlayersOfResult(match, uploaderTg, scoreText, screenshotUrl) {
   const miniAppUrl = config.miniAppUrl;
   const homeName = match.home_name;
   const awayName = match.away_name;
-  const isUploaderHome = match.home_tg === uploaderTg;
+  const uploaderStr = uploaderTg ? String(uploaderTg) : '';
+  const isUploaderHome = String(match.home_tg) === uploaderStr;
   const opponentTg = isUploaderHome ? match.away_tg : match.home_tg;
   const uploaderName = isUploaderHome ? homeName : awayName;
 
-  // 1. Notify opponent (needs to review & confirm)
+  // Strict rule: exclude the submitter's Telegram ID from receiving the notification!
+  if (!opponentTg || String(opponentTg) === uploaderStr) {
+    return;
+  }
+
   const oppCaption = `⚽ <b>eFootball Liga: Natija kiritildi!</b>\n\n` +
     `Uchrashuv: <b>${homeName}</b> vs <b>${awayName}</b>\n` +
     `Kiritilgan hisob: <b>${scoreText}</b>\n` +
     `Kirituvchi: <b>${uploaderName}</b>\n\n` +
-    `Iltimos, Mini App'ga kirib skrinshotni tekshiring va natijani tasdiqlang yoki e'tiroz bildiring.`;
+    `Iltimos, natijani tekshirib, tasdiqlang yoki e'tiroz bildiring.\n` +
+    `<i>⚠️ Siz tasdiqlaganingizdan so‘ng natija rasman turnir jadvaliga qo‘shiladi.</i>`;
 
   const oppMarkup = {
     inline_keyboard: [
-      [createAppButton('✅ Natijani tasdiqlash / ko‘rish', `${miniAppUrl}?match_id=${match.id}&view=matches`)]
+      [
+        { text: '✅ Hisobni tasdiqlash', callback_data: `confirm_match_${match.id}` },
+        { text: '❌ Rad etish', callback_data: `dispute_match_${match.id}` }
+      ],
+      [
+        createAppButton('📱 Mini App’da ko‘rish', `${miniAppUrl}?match_id=${match.id}&view=matches`)
+      ]
     ]
   };
 
+  // Send ONLY to the opponent (submitter is excluded)
   await sendTelegramPhoto(opponentTg, screenshotUrl, oppCaption, oppMarkup);
 
-  // 2. Notify uploader (confirmation of submission)
-  const uploaderCaption = `📤 <b>Natijangiz qabul qilindi!</b>\n\n` +
-    `Uchrashuv: <b>${homeName}</b> vs <b>${awayName}</b>\n` +
-    `Hisob: <b>${scoreText}</b>\n\n` +
-    `Skrinshot saqlandi. Raqibingiz tasdiqlashi kutilmoqda.`;
-
-  const uploaderMarkup = {
-    inline_keyboard: [
-      [createAppButton('📱 Turnirni ochish', `${miniAppUrl}?view=matches`)]
-    ]
-  };
-
-  await sendTelegramPhoto(uploaderTg, screenshotUrl, uploaderCaption, uploaderMarkup);
-
-  // 3. Group channel/topic notification if TELEGRAM_GROUP_ID configured
+  // Group channel/topic notification if TELEGRAM_GROUP_ID configured
   const groupId = process.env.TELEGRAM_GROUP_ID;
   if (groupId && botInstance) {
     try {
@@ -131,8 +131,6 @@ async function notifyBothPlayersOfResult(match, uploaderTg, scoreText, screensho
     } catch (gErr) {
       console.warn(`[Telegram Group] Guruhga yuborishda xatolik (${groupId}):`, gErr.message);
     }
-  } else {
-    console.log(`[Telegram Group] TELEGRAM_GROUP_ID sozlanmagan. Natijalar Mini App va o‘yinchilar bot chatida saqlandi.`);
   }
 }
 
@@ -184,9 +182,10 @@ async function notifyResultConfirmed(homeTg, awayTg, homeName, awayName, scoreTe
 }
 
 /**
- * Notify both players when Admin enters/saves match result for dual confirmation
+ * Notify opponent(s) when Admin enters/saves match result for confirmation.
+ * The submitter's Telegram ID is strictly excluded from recipients.
  */
-async function notifyAdminSubmissionForConfirmation(match, scoreText, screenshotUrl) {
+async function notifyAdminSubmissionForConfirmation(match, scoreText, screenshotUrl, submitterTg = null) {
   const miniAppUrl = config.miniAppUrl;
   const homeName = match.home_name;
   const awayName = match.away_name;
@@ -195,7 +194,7 @@ async function notifyAdminSubmissionForConfirmation(match, scoreText, screenshot
     `Uchrashuv: <b>${homeName}</b> vs <b>${awayName}</b>\n` +
     `Hisob: <b>${scoreText}</b>\n\n` +
     `Iltimos, natijani tekshirib, tasdiqlang yoki e'tiroz bildiring.\n` +
-    `<i>⚠️ Natija ikkala o‘yinchi ham tasdiqlagandan so‘ng rasman turnir jadvaliga qo‘shiladi.</i>`;
+    `<i>⚠️ Natija tasdiqlangandan so‘ng rasman turnir jadvaliga qo‘shiladi.</i>`;
 
   const markup = {
     inline_keyboard: [
@@ -209,23 +208,27 @@ async function notifyAdminSubmissionForConfirmation(match, scoreText, screenshot
     ]
   };
 
-  // 1. Send to Home player
-  if (match.home_tg) {
-    await sendTelegramPhoto(match.home_tg, screenshotUrl, caption, markup);
+  // STRICT RULE: Exclude the submitter's Telegram ID from receiving the notification!
+  const submitterStr = submitterTg ? String(submitterTg) : null;
+  const recipients = [];
+  if (match.home_tg && String(match.home_tg) !== submitterStr) {
+    recipients.push(match.home_tg);
+  }
+  if (match.away_tg && String(match.away_tg) !== submitterStr) {
+    recipients.push(match.away_tg);
   }
 
-  // 2. Send to Away player
-  if (match.away_tg) {
-    await sendTelegramPhoto(match.away_tg, screenshotUrl, caption, markup);
+  for (const tgId of recipients) {
+    await sendTelegramPhoto(tgId, screenshotUrl, caption, markup);
   }
 
-  // 3. Group notification if configured
+  // Group notification if configured
   const groupId = process.env.TELEGRAM_GROUP_ID;
   if (groupId && botInstance) {
     try {
       const groupCaption = `📢 <b>${match.round}-Tur natijasi kiritildi:</b>\n` +
         `⚔️ <b>${homeName}</b> ${scoreText} <b>${awayName}</b>\n` +
-        `⏳ <i>Ikkala o‘yinchi tasdig‘i kutilmoqda</i>`;
+        `⏳ <i>Tasdiqlash kutilmoqda</i>`;
       await sendTelegramPhoto(groupId, screenshotUrl, groupCaption);
     } catch (gErr) {}
   }
