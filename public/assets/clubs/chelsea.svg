@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <!-- Royal Blue Circle -->
+  <circle cx="50" cy="50" r="46" fill="#034694" stroke="#ffffff" stroke-width="2"/>
+  <circle cx="50" cy="50" r="41" fill="#034694" stroke="#dba111" stroke-width="1.5"/>
+  <circle cx="50" cy="50" r="32" fill="#ffffff" stroke="#dba111" stroke-width="1.5"/>
+  <!-- Top Text: CHELSEA -->
+  <text x="50" y="22" font-family="'Rajdhani', sans-serif" font-weight="800" font-size="8" fill="#ffffff" text-anchor="middle" letter-spacing="2">CHELSEA</text>
+  <text x="50" y="87" font-family="'Rajdhani', sans-serif" font-weight="800" font-size="8" fill="#ffffff" text-anchor="middle" letter-spacing="2">FOOTBALL CLUB</text>
+  <!-- Lion holding Staff -->
+  <g fill="#034694">
+    <path d="M46 36 C42 36, 40 40, 42 44 L44 48 C42 50, 40 54, 42 60 L44 68 C44 70, 52 70, 52 68 L50 62 C54 60, 58 54, 56 46 C54 40, 50 36, 46 36 Z"/>
+    <!-- Staff / Crozier -->
+    <line x1="58" y1="36" x2="58" y2="70" stroke="#dba111" stroke-width="2"/>
+    <path d="M58 36 C60 34, 64 34, 64 38 C64 40, 60 40, 58 38" fill="none" stroke="#dba111" stroke-width="2"/>
+  </g>
+</svg>

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>eFootball League</title>
+
+  <!-- Telegram WebApp JS SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <!-- Google Fonts: Rubik (400, 500, 600, 700) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/animations.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Top Status / Header Bar -->
+    <header class="top-header">
+      <div class="top-header-title" id="headerLeagueTitle">
+        <svg class="i top-header-icon" viewBox="0 0 24 24">
+          <path d="M3 11 12 3l9 8M5 10v10h5v-6h4v6h5V10"/>
+        </svg>
+        <span id="headerLeagueText">eFootball Uzbekistan Masters • 1-Mavsum</span>
+      </div>
+
+      <div class="top-header-user" id="headerUserTag">
+        <span class="user-status-pill">
+          <span class="dot"></span>
+          <span>Yuklanmoqda...</span>
+        </span>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="main-content" id="mainContent">
+      <div class="state-box" id="initialLoadingSpinner">
+        <div class="spinner"></div>
+        <div style="font-weight: 500; color: var(--text-secondary); margin-top: 10px;">
+          Turnir yuklanmoqda...
+        </div>
+        <div style="margin-top: 14px; display: none;" id="fallbackRetryBtn">
+          <button class="pill on" onclick="if(window.App) App.navigateTo('standings'); else location.reload();">
+            Qayta urinish
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <!-- Bottom Navigation Bar (Strictly 3 tabs) -->
+    <nav class="bottom-nav-bar" id="bottomNav">
+      <!-- 1. Jadval -->
+      <button class="pill on" data-view="standings" id="tabStandings" type="button">
+        <svg class="i" viewBox="0 0 24 24">
+          <path d="M5 20V10M12 20V4M19 20v-7"/>
+        </svg>
+        <span>Jadval</span>
+      </button>
+
+      <!-- 2. Natija -->
+      <button class="pill" data-view="matches" id="tabMatches" type="button">
+        <svg class="i" viewBox="0 0 24 24">
+          <rect x="4" y="3" width="16" height="18" rx="2"/>
+          <path d="M8 8h8M8 12h8M8 16h5"/>
+        </svg>
+        <span>Natija</span>
+      </button>
+
+      <!-- 3. Profil -->
+      <button class="pill" data-view="profile" id="tabProfile" type="button">
+        <svg class="i" viewBox="0 0 24 24">
+          <circle cx="12" cy="8" r="4"/>
+          <path d="M4 21c1-4 4-6 8-6s7 2 8 6"/>
+        </svg>
+        <span>Profil</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/tg.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/views/standings.js"></script>
+  <script src="js/views/matches.js"></script>
+  <script src="js/views/profile.js"></script>
+  <script src="js/views/register.js"></script>
+  <script src="js/views/adminView.js"></script>
+  <script src="js/app.js"></script>
+
+  <script>
+    // Safeguard timeout
+    setTimeout(function() {
+      var spinner = document.getElementById('initialLoadingSpinner');
+      if (spinner) {
+        if (window.App && typeof window.App.navigateTo === 'function') {
+          window.App.navigateTo('standings');
+        }
+        var retry = document.getElementById('fallbackRetryBtn');
+        if (retry) retry.style.display = 'block';
+      }
+    }, 2500);
+  </script>
+</body>
+</html>

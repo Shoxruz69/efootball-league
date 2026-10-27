@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <defs>
+    <linearGradient id="fcb-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffd700"/>
+      <stop offset="100%" stop-color="#d4af37"/>
+    </linearGradient>
+  </defs>
+  <!-- Shield Outline -->
+  <path d="M50 4 C65 4, 88 12, 88 28 C88 64, 68 88, 50 96 C32 88, 12 64, 12 28 C12 12, 35 4, 50 4 Z" fill="#ffd700" stroke="#b8860b" stroke-width="2"/>
+  <!-- Shield Inner -->
+  <path d="M50 7 C63 7, 85 14, 85 29 C85 62, 66 85, 50 93 C34 85, 15 62, 15 29 C15 14, 37 7, 50 7 Z" fill="#ffffff"/>
+  <!-- Top Left: St George Cross -->
+  <clipPath id="fcb-top-left">
+    <path d="M15 7 L50 7 L50 42 L15 42 Z"/>
+  </clipPath>
+  <g clip-path="url(#fcb-top-left)">
+    <rect x="15" y="7" width="35" height="35" fill="#ffffff"/>
+    <rect x="29" y="7" width="7" height="35" fill="#da291c"/>
+    <rect x="15" y="21" width="35" height="7" fill="#da291c"/>
+  </g>
+  <!-- Top Right: Senyera (Catalan Stripes) -->
+  <clipPath id="fcb-top-right">
+    <path d="M50 7 L85 7 L85 42 L50 42 Z"/>
+  </clipPath>
+  <g clip-path="url(#fcb-top-right)">
+    <rect x="50" y="7" width="35" height="35" fill="#ffd700"/>
+    <rect x="54" y="7" width="4" height="35" fill="#da291c"/>
+    <rect x="62" y="7" width="4" height="35" fill="#da291c"/>
+    <rect x="70" y="7" width="4" height="35" fill="#da291c"/>
+    <rect x="78" y="7" width="4" height="35" fill="#da291c"/>
+  </g>
+  <!-- Horizontal Gold Divider -->
+  <rect x="14" y="42" width="72" height="8" fill="#ffd700"/>
+  <text x="50" y="48.5" font-family="'Rajdhani', sans-serif" font-weight="800" font-size="6.5" fill="#000000" text-anchor="middle" letter-spacing="1">FCB</text>
+  <!-- Bottom: Blaugrana Vertical Stripes -->
+  <clipPath id="fcb-bottom">
+    <path d="M14 50 L86 50 L86 60 C86 70, 68 88, 50 93 C32 88, 14 70, 14 60 Z"/>
+  </clipPath>
+  <g clip-path="url(#fcb-bottom)">
+    <rect x="14" y="50" width="72" height="45" fill="#004d98"/>
+    <rect x="26" y="50" width="10" height="45" fill="#a50044"/>
+    <rect x="45" y="50" width="10" height="45" fill="#a50044"/>
+    <rect x="64" y="50" width="10" height="45" fill="#a50044"/>
+  </g>
+  <!-- Gold Ball in Bottom -->
+  <circle cx="50" cy="70" r="10" fill="#ffd700" stroke="#b8860b" stroke-width="1"/>
+  <circle cx="50" cy="70" r="8" fill="none" stroke="#775500" stroke-width="0.8"/>
+  <path d="M46 66 L54 66 L57 72 L50 76 L43 72 Z" fill="#775500"/>
+</svg>

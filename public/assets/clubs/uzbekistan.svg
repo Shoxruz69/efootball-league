@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <!-- Shield Frame -->
+  <path d="M50 4 C76 4, 88 16, 88 42 C88 74, 50 96, 50 96 C50 96, 12 74, 12 42 C12 16, 24 4, 50 4 Z" fill="#ffffff" stroke="#ffd700" stroke-width="3"/>
+  <clipPath id="uzb-shield">
+    <path d="M50 6 C74 6, 86 17, 86 42 C86 72, 50 93, 50 93 C50 93, 14 72, 14 42 C14 17, 26 6, 50 6 Z"/>
+  </clipPath>
+  <g clip-path="url(#uzb-shield)">
+    <!-- Blue Top Third -->
+    <rect x="10" y="6" width="80" height="28" fill="#0099b8"/>
+    <!-- Red Thin Line -->
+    <rect x="10" y="34" width="80" height="2" fill="#d90429"/>
+    <!-- White Middle Third -->
+    <rect x="10" y="36" width="80" height="26" fill="#ffffff"/>
+    <!-- Red Thin Line -->
+    <rect x="10" y="62" width="80" height="2" fill="#d90429"/>
+    <!-- Green Bottom Third -->
+    <rect x="10" y="64" width="80" height="35" fill="#1eb53a"/>
+    <!-- Crescent & Stars in Blue area -->
+    <path d="M30 18 C30 23, 26 27, 21 27 C19 27, 18 26, 17 25 C21 25, 24 22, 24 18 C24 14, 21 11, 17 11 C18 10, 19 9, 21 9 C26 9, 30 13, 30 18 Z" fill="#ffffff"/>
+    <!-- Humo Bird Wings / Football in Center -->
+    <circle cx="50" cy="49" r="11" fill="#ffffff" stroke="#ffd700" stroke-width="2"/>
+    <path d="M46 45 L54 45 L57 51 L50 55 L43 51 Z" fill="#ffd700"/>
+    <text x="50" y="80" font-family="'Rajdhani', sans-serif" font-weight="800" font-size="9" fill="#ffffff" text-anchor="middle" letter-spacing="1">O‘ZBEKISTON</text>
+  </g>
+</svg>

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <!-- Sky Blue Outer Ring -->
+  <circle cx="50" cy="50" r="46" fill="#6cabdd" stroke="#1c2c5b" stroke-width="3"/>
+  <circle cx="50" cy="50" r="40" fill="#ffffff"/>
+  <!-- Navy Inner Ring -->
+  <circle cx="50" cy="50" r="38" fill="#1c2c5b"/>
+  <!-- Text Ring -->
+  <text x="50" y="22" font-family="'Rajdhani', sans-serif" font-weight="800" font-size="7" fill="#ffffff" text-anchor="middle" letter-spacing="1.5">MANCHESTER</text>
+  <text x="50" y="87" font-family="'Rajdhani', sans-serif" font-weight="800" font-size="7.5" fill="#ffffff" text-anchor="middle" letter-spacing="2">CITY</text>
+  <!-- Center Shield -->
+  <path d="M30 32 L70 32 L70 54 C70 66, 50 74, 50 74 C50 74, 30 66, 30 54 Z" fill="#6cabdd" stroke="#ffffff" stroke-width="1.5"/>
+  <!-- Gold Ship -->
+  <path d="M36 34 L64 34 L60 44 L40 44 Z" fill="#ffd700"/>
+  <!-- Red Rose of Lancashire in lower shield -->
+  <circle cx="50" cy="58" r="7" fill="#da291c"/>
+  <circle cx="50" cy="58" r="3" fill="#ffe500"/>
+  <!-- Years 18 94 on sides -->
+  <text x="20" y="53" font-family="'Rajdhani', sans-serif" font-weight="800" font-size="7" fill="#ffffff" text-anchor="middle">18</text>
+  <text x="80" y="53" font-family="'Rajdhani', sans-serif" font-weight="800" font-size="7" fill="#ffffff" text-anchor="middle">94</text>
+</svg>

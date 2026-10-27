@@ -1,0 +1,21 @@
+[Unit]
+Description=eFootball League & Telegram Mini App Production Daemon
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/www/efootball
+ExecStart=/usr/bin/node server/index.js
+Restart=always
+RestartSec=5s
+Environment=NODE_ENV=production
+EnvironmentFile=/var/www/efootball/.env
+
+# Resurs cheklovlari va xavfsizlik
+LimitNOFILE=65535
+StandardOutput=append:/var/www/efootball/logs/service.log
+StandardError=append:/var/www/efootball/logs/error.log
+
+[Install]
+WantedBy=multi-user.target

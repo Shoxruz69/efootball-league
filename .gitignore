@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+package-lock.json.bak
+
+# Sensitive Environment Variables (DO NOT COMMIT!)
+.env
+.env.local
+.env.production
+
+# SQLite Database files (Created automatically in production)
+data/*.db
+data/*.db-shm
+data/*.db-wal
+data/*.sqlite
+!data/.gitkeep
+
+# User uploaded screenshots and media
+uploads/*
+!uploads/.gitkeep
+server/uploads/*
+!server/uploads/.gitkeep
+
+# System and service logs
+logs/*
+!logs/.gitkeep
+*.log
+npm-debug.log*
+
+# Auto-downloaded binaries and caches
+cloudflared.exe
+cloudflared
+eng.traineddata
+
+# OS and Editor metadata
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

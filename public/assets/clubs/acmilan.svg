@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <!-- Oval Shield -->
+  <ellipse cx="50" cy="50" rx="36" ry="46" fill="#ffffff" stroke="#000000" stroke-width="2.5"/>
+  <!-- Top Banner: ACM -->
+  <path d="M18 24 C28 12, 72 12, 82 24 L82 34 L18 34 Z" fill="#000000"/>
+  <text x="50" y="27" font-family="'Rajdhani', sans-serif" font-weight="800" font-size="11" fill="#fb090b" text-anchor="middle" letter-spacing="2">ACM</text>
+  <!-- Lower Shield Split: Left Stripes, Right St Ambrose Cross -->
+  <clipPath id="acm-inner">
+    <ellipse cx="50" cy="57" rx="32" ry="36"/>
+  </clipPath>
+  <g clip-path="url(#acm-inner)">
+    <!-- Left: Rossoneri (Red & Black) Stripes -->
+    <rect x="18" y="34" width="32" height="60" fill="#000000"/>
+    <rect x="23" y="34" width="7" height="60" fill="#fb090b"/>
+    <rect x="36" y="34" width="7" height="60" fill="#fb090b"/>
+    <!-- Center Line -->
+    <line x1="50" y1="34" x2="50" y2="94" stroke="#000000" stroke-width="1.5"/>
+    <!-- Right: St Ambrose Red Cross on White -->
+    <rect x="50" y="34" width="32" height="60" fill="#ffffff"/>
+    <rect x="62" y="34" width="8" height="60" fill="#fb090b"/>
+    <rect x="50" y="58" width="32" height="8" fill="#fb090b"/>
+  </g>
+  <!-- Year 1899 at bottom -->
+  <text x="50" y="93" font-family="'Rajdhani', sans-serif" font-weight="700" font-size="7" fill="#000000" text-anchor="middle" letter-spacing="1">1899</text>
+  <!-- Gold Star on Top -->
+  <polygon points="50,4 52,9 57,9 53,12 55,17 50,14 45,17 47,12 43,9 48,9" fill="#ffd700"/>
+</svg>

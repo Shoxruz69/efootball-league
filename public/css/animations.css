@@ -1,0 +1,62 @@
+/* ==========================================================================
+   eFootball 2026 Micro-Animations
+   Smooth 60fps, GPU-accelerated (transform, opacity only)
+   ========================================================================== */
+
+/* Fade + 8px slide for views */
+@keyframes viewSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Modal Elevation */
+@keyframes modalPopup {
+  0% {
+    opacity: 0;
+    transform: scale(0.92) translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Confirmed Match Card Glow */
+@keyframes confirmedGlow {
+  0% {
+    transform: scale(0.98);
+    box-shadow: 0 0 0 0 rgba(45, 224, 138, 0.8);
+  }
+  50% {
+    transform: scale(1.02);
+    box-shadow: 0 0 20px 4px rgba(45, 224, 138, 0.5);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 4px 14px rgba(26, 42, 74, 0.2);
+  }
+}
+
+/* Staggered entrance helper for rows */
+.table-data-row:nth-child(1) { animation-delay: 0ms; }
+.table-data-row:nth-child(2) { animation-delay: 40ms; }
+.table-data-row:nth-child(3) { animation-delay: 80ms; }
+.table-data-row:nth-child(4) { animation-delay: 120ms; }
+.table-data-row:nth-child(5) { animation-delay: 160ms; }
+.table-data-row:nth-child(6) { animation-delay: 200ms; }
+.table-data-row:nth-child(7) { animation-delay: 240ms; }
+.table-data-row:nth-child(8) { animation-delay: 280ms; }
+.table-data-row:nth-child(9) { animation-delay: 320ms; }
+.table-data-row:nth-child(10) { animation-delay: 360ms; }
+
+/* Interactive tap feedback */
+button:active, .pill:active, .match-card:active {
+  transform: scale(0.96);
+  transition: transform 120ms ease;
+}

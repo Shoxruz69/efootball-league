@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <!-- Outer Gold Shield/Circle -->
+  <circle cx="50" cy="50" r="46" fill="#da291c" stroke="#ffe500" stroke-width="4"/>
+  <circle cx="50" cy="50" r="42" fill="#ffe500"/>
+  <!-- Top and Bottom Red Arcs -->
+  <path d="M12 50 C12 28, 28 12, 50 12 C72 12, 88 28, 88 50 C88 38, 72 26, 50 26 C28 26, 12 38, 12 50 Z" fill="#da291c"/>
+  <text x="50" y="22" font-family="'Rajdhani', sans-serif" font-weight="800" font-size="7.5" fill="#ffe500" text-anchor="middle" letter-spacing="1.2">MANCHESTER</text>
+  <path d="M12 50 C12 72, 28 88, 50 88 C72 88, 88 72, 88 50 C88 62, 72 74, 50 74 C28 74, 12 62, 12 50 Z" fill="#da291c"/>
+  <text x="50" y="83" font-family="'Rajdhani', sans-serif" font-weight="800" font-size="8" fill="#ffe500" text-anchor="middle" letter-spacing="1.5">UNITED</text>
+  <!-- Center Shield -->
+  <path d="M30 32 L70 32 L70 54 C70 66, 50 74, 50 74 C50 74, 30 66, 30 54 Z" fill="#da291c" stroke="#ffe500" stroke-width="2"/>
+  <!-- Galleon Ship in upper shield -->
+  <path d="M36 34 L64 34 L60 44 L40 44 Z" fill="#ffe500"/>
+  <path d="M48 35 L48 43 M52 35 L52 43" stroke="#da291c" stroke-width="1"/>
+  <!-- Red Devil silhouette in lower shield -->
+  <path d="M50 48 C46 48, 43 51, 44 55 L46 63 C47 66, 53 66, 54 63 L56 55 C57 51, 54 48, 50 48 Z" fill="#ffe500"/>
+  <!-- Pitchfork -->
+  <line x1="50" y1="46" x2="50" y2="68" stroke="#ffe500" stroke-width="1.5"/>
+  <path d="M47 48 L50 45 L53 48" stroke="#ffe500" stroke-width="1.5" fill="none"/>
+</svg>

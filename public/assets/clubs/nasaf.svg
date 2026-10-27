@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <!-- Shield Frame: Red & Blue -->
+  <path d="M50 4 C76 4, 88 16, 88 42 C88 74, 50 96, 50 96 C50 96, 12 74, 12 42 C12 16, 24 4, 50 4 Z" fill="#da291c" stroke="#003399" stroke-width="3"/>
+  <clipPath id="nas-shield">
+    <path d="M50 6 C74 6, 86 17, 86 42 C86 72, 50 93, 50 93 C50 93, 14 72, 14 42 C14 17, 26 6, 50 6 Z"/>
+  </clipPath>
+  <g clip-path="url(#nas-shield)">
+    <rect x="10" y="6" width="40" height="90" fill="#da291c"/>
+    <rect x="50" y="6" width="40" height="90" fill="#003399"/>
+    <!-- Center White Ball -->
+    <circle cx="50" cy="46" r="16" fill="#ffffff" stroke="#ffd700" stroke-width="2"/>
+    <path d="M46 42 L54 42 L57 48 L50 52 L43 48 Z" fill="#da291c"/>
+    <text x="50" y="80" font-family="'Rajdhani', sans-serif" font-weight="800" font-size="10" fill="#ffffff" text-anchor="middle" letter-spacing="1.5">NASAF</text>
+  </g>
+</svg>
