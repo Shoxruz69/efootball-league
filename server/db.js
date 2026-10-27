@@ -126,6 +126,34 @@ function initSchema() {
       'registration'
     );
   }
+
+  // Ensure 5 test participants exist in active league (without touching the user)
+  const activeLeague = db.prepare("SELECT id FROM leagues WHERE status != 'completed' ORDER BY id DESC LIMIT 1").get();
+  if (activeLeague) {
+    const testParticipants = [
+      { tg: '10002', name: 'Javohir', club: 'Barcelona', color: '#a50044' },
+      { tg: '10003', name: 'Bekzod', club: 'Manchester City', color: '#6cabdd' },
+      { tg: '10004', name: 'Sardor', club: 'Arsenal', color: '#ef0107' },
+      { tg: '10005', name: 'Alisher', club: 'Bayern Munich', color: '#dc052d' },
+      { tg: '10006', name: 'Doniyor', club: 'Inter Milan', color: '#00e5ff' }
+    ];
+
+    const insertPartStmt = db.prepare(`
+      INSERT INTO participants (league_id, telegram_id, player_name, club_name, club_badge_color, status)
+      VALUES (?, ?, ?, ?, ?, 'active')
+    `);
+
+    for (const p of testParticipants) {
+      const exists = db.prepare(`
+        SELECT id FROM participants 
+        WHERE league_id = ? AND (telegram_id = ? OR LOWER(TRIM(player_name)) = LOWER(?))
+      `).get(activeLeague.id, p.tg, p.name);
+
+      if (!exists) {
+        insertPartStmt.run(activeLeague.id, p.tg, p.name, p.club, p.color);
+      }
+    }
+  }
 }
 
 initSchema();

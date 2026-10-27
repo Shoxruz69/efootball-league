@@ -293,6 +293,52 @@ router.post('/register', (req, res) => {
   }
 });
 
+// Add 5 test participants endpoint (without removing existing players)
+router.post('/add-test-participants', (req, res) => {
+  try {
+    const league = db.prepare("SELECT id FROM leagues WHERE status != 'completed' ORDER BY id DESC LIMIT 1").get();
+    if (!league) {
+      return res.status(404).json({ success: false, message: 'Faol liga topilmadi.' });
+    }
+
+    const testParticipants = [
+      { tg: '10002', name: 'Javohir', club: 'Barcelona', color: '#a50044' },
+      { tg: '10003', name: 'Bekzod', club: 'Manchester City', color: '#6cabdd' },
+      { tg: '10004', name: 'Sardor', club: 'Arsenal', color: '#ef0107' },
+      { tg: '10005', name: 'Alisher', club: 'Bayern Munich', color: '#dc052d' },
+      { tg: '10006', name: 'Doniyor', club: 'Inter Milan', color: '#00e5ff' }
+    ];
+
+    let addedCount = 0;
+    const insertStmt = db.prepare(`
+      INSERT INTO participants (league_id, telegram_id, player_name, club_name, club_badge_color, status)
+      VALUES (?, ?, ?, ?, ?, 'active')
+    `);
+
+    for (const p of testParticipants) {
+      const exists = db.prepare(`
+        SELECT id FROM participants 
+        WHERE league_id = ? AND (telegram_id = ? OR LOWER(TRIM(player_name)) = LOWER(?))
+      `).get(league.id, p.tg, p.name);
+
+      if (!exists) {
+        insertStmt.run(league.id, p.tg, p.name, p.club, p.color);
+        addedCount++;
+      }
+    }
+
+    broadcast({ type: 'participants_updated', leagueId: league.id });
+    res.json({
+      success: true,
+      message: `${addedCount} ta test ishtirokchisi qo‘shildi.`,
+      addedCount
+    });
+  } catch (err) {
+    console.error('Test ishtirokchilarini qo‘shishda xatolik:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Admin remove participant or user leaves
 router.post('/remove', (req, res) => {
   try {
