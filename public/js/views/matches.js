@@ -479,9 +479,9 @@ const MatchesView = {
             <div class="form-group" style="margin-bottom: 14px; text-align: left;">
               <label class="form-label" style="font-size: 12px; color: #ffffff;">Uchrashuv holati:</label>
               <select id="adminMatchStatus" class="form-control" style="background: #0d0d12; border: 1px solid rgba(255,255,255,0.15); color: #ffffff; padding: 8px 10px; border-radius: 8px;">
-                <option value="finished" ${match.status === 'finished' ? 'selected' : ''}>Yakunlangan (Tasdiqlash va Jadvalga kiritish)</option>
-                <option value="submitted" ${match.status === 'submitted' ? 'selected' : ''}>Kiritilgan (Tasdiqlash kutilmoqda)</option>
                 <option value="scheduled" ${match.status === 'scheduled' ? 'selected' : ''}>Kutilmoqda (O‘ynalmagan / Tiklash)</option>
+                <option value="submitted" ${match.status === 'submitted' ? 'selected' : ''}>Kiritilgan (Tasdiqlash kutilmoqda)</option>
+                <option value="finished" ${match.status === 'finished' ? 'selected' : ''}>Yakunlangan (Tasdiqlash va Jadvalga kiritish)</option>
               </select>
             </div>
 
@@ -580,12 +580,14 @@ const MatchesView = {
           </button>
         `;
       }
-      // CASE 4: MATCH IS SUBMITTED (AWAITING CONFIRMATION)
+      // CASE 4: MATCH IS SUBMITTED (AWAITING DUAL CONFIRMATION)
       else if (match.status === 'submitted') {
-        const uploaderIsHome = match.home_confirmed === 1;
-        const iAmUploader = (isHome && uploaderIsHome) || (isAway && !uploaderIsHome);
+        // Did the current viewing player confirm?
+        const hasMyConfirmed = isHome ? (match.home_confirmed === 1) : (match.away_confirmed === 1);
+        const opponentName = isHome ? match.away_player_name : match.home_player_name;
 
-        if (iAmUploader) {
+        if (hasMyConfirmed) {
+          // Current player already confirmed, waiting for opponent
           modalContent = `
             <div class="modal-icon-wrap" style="color: #ff9800; background: rgba(255, 152, 0, 0.1);">
               <svg class="i" viewBox="0 0 24 24">
@@ -593,17 +595,18 @@ const MatchesView = {
                 <polyline points="12 6 12 12 16 14"/>
               </svg>
             </div>
-            <h3 style="color: #ffffff;">Tasdiqlash kutilmoqda</h3>
+            <h3 style="color: #ffffff;">Raqib tasdig‘i kutilmoqda</h3>
             <div style="font-size: 30px; font-weight: 700; color: #ffffff; margin: 6px 0;">
               ${match.home_score} - ${match.away_score}
             </div>
-            <p style="color: var(--muted);">
-              Siz kiritgan hisob yuborildi. Raqibingiz (<b>${this.escape(isHome ? match.away_player_name : match.home_player_name)}</b>) tasdiqlashi kutilmoqda.
+            <p style="color: var(--muted); font-size: 13.5px; line-height: 1.5;">
+              Siz natijani tasdiqladingiz. Raqibingiz (<b>${this.escape(opponentName)}</b>) tasdiqlashi kutilmoqda.<br>
+              <span style="font-size: 12px; color: #ff9800;">Ikkala tomon tasdiqlagach natija rasman turnir jadvaliga qo‘shiladi.</span>
             </p>
             ${match.screenshot_url ? `
               <div style="text-align: left; margin: 12px 0;">
                 <label class="form-label" style="color: #ffffff;">Yuklangan skrinshot:</label>
-                <img src="${match.screenshot_url}" class="screenshot-preview-thumb" alt="Skrinshot" style="max-height: 180px; width: 100%; object-fit: contain; background: #000; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);" />
+                <img src="${match.screenshot_url}" class="screenshot-preview-thumb" alt="Skrinshot" style="max-height: 180px; width: 100%; object-fit: contain; background: #000; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); cursor: pointer;" onclick="ProfileView?.openScreenshotModal ? ProfileView.openScreenshotModal('${this.escape(match.screenshot_url)}') : window.open('${this.escape(match.screenshot_url)}', '_blank')" />
               </div>
             ` : ''}
             <button class="pill on" onclick="MatchesView.closeModal()" type="button" style="width: 100%;">
@@ -611,7 +614,7 @@ const MatchesView = {
             </button>
           `;
         } else {
-          // Opponent sees the result and can Confirm or Dispute
+          // Current player needs to review and confirm or dispute
           modalContent = `
             <div class="modal-icon-wrap" style="color: var(--cyan); background: rgba(25, 201, 255, 0.1);">
               <svg class="i" viewBox="0 0 24 24">
@@ -621,7 +624,7 @@ const MatchesView = {
             </div>
             <h3 style="color: #ffffff;">Natijani tasdiqlash</h3>
             <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 12px; margin: 10px 0;">
-              <div style="font-size: 12px; color: var(--muted);">Raqib kiritgan hisob:</div>
+              <div style="font-size: 12px; color: var(--muted);">Kiritilgan hisob:</div>
               <div style="font-size: 32px; font-weight: 700; color: #ffffff; letter-spacing: 2px; margin: 4px 0;">
                 ${match.home_score} - ${match.away_score}
               </div>
@@ -631,8 +634,8 @@ const MatchesView = {
             </div>
             ${match.screenshot_url ? `
               <div style="text-align: left; margin: 12px 0;">
-                <label class="form-label" style="color: #ffffff;">Raqib yuklagan skrinshot:</label>
-                <img src="${match.screenshot_url}" class="screenshot-preview-thumb" alt="Skrinshot" style="max-height: 180px; width: 100%; object-fit: contain; background: #000; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);" />
+                <label class="form-label" style="color: #ffffff;">Biriktirilgan skrinshot:</label>
+                <img src="${match.screenshot_url}" class="screenshot-preview-thumb" alt="Skrinshot" style="max-height: 180px; width: 100%; object-fit: contain; background: #000; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); cursor: pointer;" onclick="ProfileView?.openScreenshotModal ? ProfileView.openScreenshotModal('${this.escape(match.screenshot_url)}') : window.open('${this.escape(match.screenshot_url)}', '_blank')" />
               </div>
             ` : ''}
             <div style="display: flex; gap: 10px; margin-top: 16px;">
@@ -640,13 +643,47 @@ const MatchesView = {
                 Hisobni tasdiqlash
               </button>
               <button class="pill" onclick="MatchesView.disputeResult(${match.id})" type="button" style="color: var(--loss); border-color: rgba(255, 77, 109, 0.3);">
-                E'tiroz
+                Rad etish / E'tiroz
               </button>
             </div>
           `;
         }
       }
-      // CASE 5: SCHEDULED / DISPUTED - SCORE ENTRY FORM
+      // CASE 4.5: MATCH IS DISPUTED (WAITING FOR ADMIN REVIEW)
+      else if (match.status === 'disputed') {
+        modalContent = `
+          <div class="modal-icon-wrap" style="color: var(--loss); background: rgba(255, 77, 109, 0.12);">
+            <svg class="i" viewBox="0 0 24 24">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+          </div>
+          <h3 style="color: #ffffff;">Admin ko‘rib chiqishi kutilmoqda</h3>
+          <div style="font-size: 26px; font-weight: 700; color: #ffffff; margin: 6px 0;">
+            ${match.home_score !== null && match.away_score !== null ? `${match.home_score} - ${match.away_score}` : 'E\'tiroz bildirilgan'}
+          </div>
+          <p style="color: var(--muted); font-size: 13.5px; line-height: 1.5;">
+            Ushbu uchrashuv natijasi rad etilgan. Hozirda liga admini natija va skrinshotni ko‘rib chiqmoqda.<br>
+            <span style="font-size: 12px; color: var(--loss);">Turnir jadvali admin qaror qabul qilguncha o‘zgarmaydi.</span>
+          </p>
+          ${match.dispute_reason ? `
+            <div style="background: rgba(255, 77, 109, 0.08); border: 1px solid rgba(255, 77, 109, 0.2); border-radius: 8px; padding: 8px 12px; margin: 10px 0; text-align: left; font-size: 12px; color: #ff8597;">
+              <b>Sabab:</b> ${this.escape(match.dispute_reason)}
+            </div>
+          ` : ''}
+          ${match.screenshot_url ? `
+            <div style="text-align: left; margin: 12px 0;">
+              <label class="form-label" style="color: #ffffff;">Yuklangan skrinshot:</label>
+              <img src="${match.screenshot_url}" class="screenshot-preview-thumb" alt="Skrinshot" style="max-height: 180px; width: 100%; object-fit: contain; background: #000; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); cursor: pointer;" onclick="ProfileView?.openScreenshotModal ? ProfileView.openScreenshotModal('${this.escape(match.screenshot_url)}') : window.open('${this.escape(match.screenshot_url)}', '_blank')" />
+            </div>
+          ` : ''}
+          <button class="pill on" onclick="MatchesView.closeModal()" type="button" style="width: 100%;">
+            Tushundim
+          </button>
+        `;
+      }
+      // CASE 5: SCHEDULED - SCORE ENTRY FORM
       else {
         modalContent = `
           <div class="modal-icon-wrap" style="color: var(--cyan); background: rgba(25, 201, 255, 0.1);">
@@ -795,7 +832,12 @@ const MatchesView = {
 
     const homeScore = parseInt(homeScoreInput?.value || '0', 10);
     const awayScore = parseInt(awayScoreInput?.value || '0', 10);
-    const status = statusSelect?.value || 'finished';
+    let status = statusSelect?.value || 'submitted';
+
+    // If status is 'scheduled', saving score sends it as 'submitted' for dual confirmation
+    if (status === 'scheduled') {
+      status = 'submitted';
+    }
 
     if (isNaN(homeScore) || isNaN(awayScore) || homeScore < 0 || awayScore < 0) {
       alert("Hisob to'g'ri sonlarda kiritilishi shart.");
@@ -855,7 +897,11 @@ const MatchesView = {
         window.App.refreshStandings();
       }
 
-      alert("Uchrashuv ma'lumotlari admin tomonidan muvaffaqiyatli saqlandi va turnir jadvali qayta hisoblandi!");
+      if (status === 'submitted') {
+        alert("Uchrashuv natijasi saqlandi! Ikkala o‘yinchiga Telegram bot orqali tasdiqlash so‘rovi yuborildi. Ikkalasi tasdiqlagach, natija rasman turnir jadvaliga qo‘shiladi.");
+      } else {
+        alert("Uchrashuv ma'lumotlari admin tomonidan muvaffaqiyatli saqlandi va turnir jadvali yangilandi!");
+      }
 
     } catch (err) {
       try { window.TelegramService?.haptic('error'); } catch (e) {}

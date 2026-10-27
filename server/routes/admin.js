@@ -427,12 +427,22 @@ router.post('/start-new-season', (req, res) => {
 });
 
 // 10. Manually edit any match score, screenshot, status, and stats
-router.put('/matches/:id', (req, res) => {
+router.put('/matches/:id', async (req, res) => {
   try {
     const matchId = parseInt(req.params.id, 10);
     const { home_score, away_score, status, screenshot_url, stats } = req.body;
 
-    const match = db.prepare('SELECT * FROM matches WHERE id = ?').get(matchId);
+    const match = db.prepare(`
+      SELECT 
+        m.*,
+        h.player_name as home_name, h.telegram_id as home_tg,
+        a.player_name as away_name, a.telegram_id as away_tg
+      FROM matches m
+      JOIN participants h ON m.home_participant_id = h.id
+      JOIN participants a ON m.away_participant_id = a.id
+      WHERE m.id = ?
+    `).get(matchId);
+
     if (!match) {
       return res.status(404).json({ success: false, message: 'Uchrashuv topilmadi.' });
     }
@@ -440,10 +450,10 @@ router.put('/matches/:id', (req, res) => {
     const h = home_score !== undefined && home_score !== null && home_score !== '' ? parseInt(home_score, 10) : match.home_score;
     const a = away_score !== undefined && away_score !== null && away_score !== '' ? parseInt(away_score, 10) : match.away_score;
 
-    // Status can be explicitly specified or defaults to 'finished' if scores are present
+    // Status: default to 'submitted' if scores exist so both players are requested to confirm
     let s = status;
     if (!s) {
-      s = (h !== null && a !== null) ? 'finished' : match.status;
+      s = (h !== null && a !== null) ? 'submitted' : match.status;
     }
 
     const scUrl = screenshot_url !== undefined ? screenshot_url : match.screenshot_url;
@@ -453,9 +463,22 @@ router.put('/matches/:id', (req, res) => {
       statsJson = typeof stats === 'string' ? stats : JSON.stringify(stats);
     }
 
-    // When status is finished, mark both participants confirmed
-    const homeConfirmed = s === 'finished' ? 1 : match.home_confirmed;
-    const awayConfirmed = s === 'finished' ? 1 : match.away_confirmed;
+    // Confirmation flags:
+    // If 'submitted': both confirmations are 0 to require dual verification from both players!
+    // If 'finished': admin explicitly finalized it, so both are 1.
+    // Otherwise keep current.
+    let homeConfirmed = 0;
+    let awayConfirmed = 0;
+    if (s === 'finished') {
+      homeConfirmed = 1;
+      awayConfirmed = 1;
+    } else if (s === 'submitted') {
+      homeConfirmed = 0;
+      awayConfirmed = 0;
+    } else {
+      homeConfirmed = match.home_confirmed;
+      awayConfirmed = match.away_confirmed;
+    }
 
     db.prepare(`
       UPDATE matches
@@ -471,7 +494,18 @@ router.put('/matches/:id', (req, res) => {
       WHERE id = ?
     `).run(h, a, s, scUrl, statsJson, homeConfirmed, awayConfirmed, matchId);
 
-    // Settle prediction points if finished
+    // If submitted, notify BOTH players via Telegram Bot with confirmation request
+    if (s === 'submitted' && h !== null && a !== null) {
+      try {
+        const { notifyAdminSubmissionForConfirmation } = require('../services/botNotifier');
+        const scoreText = `${h} - ${a}`;
+        await notifyAdminSubmissionForConfirmation(match, scoreText, scUrl);
+      } catch (err) {
+        console.warn('Bot confirmation notification warning:', err.message);
+      }
+    }
+
+    // Only if finished, settle prediction points and check auto-advance round
     if (s === 'finished' && h !== null && a !== null) {
       try {
         const { settlePredictions } = require('./results');
@@ -479,11 +513,9 @@ router.put('/matches/:id', (req, res) => {
           settlePredictions(matchId, h, a);
         }
       } catch (e) {}
-    }
 
-    // Auto-advance round if all matches in round are now finished
-    if (s === 'finished') {
       checkAndAdvanceRound(match.league_id);
+      broadcast({ type: 'standings_updated', leagueId: match.league_id });
     }
 
     let parsedStats = null;
@@ -495,20 +527,27 @@ router.put('/matches/:id', (req, res) => {
         home_score: h,
         away_score: a,
         screenshot_url: scUrl,
+        home_confirmed: homeConfirmed,
+        away_confirmed: awayConfirmed,
         stats: parsedStats
       });
     }
 
-    broadcast({ type: 'standings_updated', leagueId: match.league_id });
+    const message = (s === 'submitted')
+      ? 'Uchrashuv natijasi saqlandi. Ikkala o‘yinchiga Telegram orqali tasdiqlash so‘rovi yuborildi. Ikkalasi tasdiqlagach jadval yangilanadi.'
+      : 'Uchrashuv ma‘lumotlari admin tomonidan muvaffaqiyatli saqlandi.';
+
     res.json({
       success: true,
-      message: 'Uchrashuv ma‘lumotlari admin tomonidan muvaffaqiyatli saqlandi.',
+      message,
       match: {
         id: matchId,
         home_score: h,
         away_score: a,
         status: s,
         screenshot_url: scUrl,
+        home_confirmed: homeConfirmed,
+        away_confirmed: awayConfirmed,
         stats: parsedStats
       }
     });

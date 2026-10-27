@@ -225,6 +225,225 @@ function initBot() {
     });
   });
 
+  // Callback query: confirm_match_<id>
+  bot.action(/^confirm_match_(\d+)$/, async (ctx) => {
+    try {
+      const matchId = parseInt(ctx.match[1], 10);
+      const telegramId = String(ctx.from.id);
+
+      const match = db.prepare(`
+        SELECT 
+          m.*,
+          h.player_name as home_name, h.telegram_id as home_tg,
+          a.player_name as away_name, a.telegram_id as away_tg
+        FROM matches m
+        JOIN participants h ON m.home_participant_id = h.id
+        JOIN participants a ON m.away_participant_id = a.id
+        WHERE m.id = ?
+      `).get(matchId);
+
+      if (!match) {
+        return ctx.answerCbQuery('❌ Uchrashuv topilmadi.', { show_alert: true });
+      }
+
+      const isHome = match.home_tg === telegramId;
+      const isAway = match.away_tg === telegramId;
+
+      if (!isHome && !isAway) {
+        return ctx.answerCbQuery('⛔ Siz ushbu uchrashuv ishtirokchisi emassiz.', { show_alert: true });
+      }
+
+      if (match.status === 'finished') {
+        return ctx.answerCbQuery('✅ Ushbu uchrashuv natijasi allaqachon tasdiqlangan.', { show_alert: true });
+      }
+
+      let newHomeConfirmed = match.home_confirmed || 0;
+      let newAwayConfirmed = match.away_confirmed || 0;
+
+      if (isHome) newHomeConfirmed = 1;
+      if (isAway) newAwayConfirmed = 1;
+
+      const bothConfirmed = (newHomeConfirmed === 1 && newAwayConfirmed === 1);
+
+      if (bothConfirmed) {
+        // Both confirmed! Mark finished and update standings
+        db.prepare(`
+          UPDATE matches
+          SET status = 'finished',
+              home_confirmed = 1,
+              away_confirmed = 1,
+              dispute_reason = NULL,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(matchId);
+
+        try {
+          const { settlePredictions } = require('./routes/results');
+          if (typeof settlePredictions === 'function') {
+            settlePredictions(matchId, match.home_score, match.away_score);
+          }
+        } catch (e) {}
+
+        const { notifyResultConfirmed } = require('./services/botNotifier');
+        const scoreText = `${match.home_score} - ${match.away_score}`;
+        await notifyResultConfirmed(match.home_tg, match.away_tg, match.home_name, match.away_name, scoreText);
+
+        const { broadcast, broadcastMatchEvent } = require('./services/websocket');
+        broadcastMatchEvent(matchId, {
+          status: 'finished',
+          home_score: match.home_score,
+          away_score: match.away_score,
+          home_confirmed: 1,
+          away_confirmed: 1
+        });
+        broadcast({ type: 'standings_updated', leagueId: match.league_id });
+
+        const { checkAndAdvanceRound } = require('./services/roundManager');
+        checkAndAdvanceRound(match.league_id);
+
+        await ctx.answerCbQuery('✅ Natija tasdiqlandi! Turnir jadvali yangilandi.', { show_alert: true });
+        await ctx.editMessageCaption(
+          `✅ <b>Uchrashuv natijasi ikkala o‘yinchi tomonidan tasdiqlandi!</b>\n\n` +
+          `⚔️ <b>${match.home_name}</b> ${scoreText} <b>${match.away_name}</b>\n\n` +
+          `🏆 Turnir jadvali va ochkolar rasman yangilandi.`,
+          {
+            parse_mode: 'HTML',
+            reply_markup: {
+              inline_keyboard: [
+                [createAppButton('📊 Jadvalni ko‘rish', `${config.miniAppUrl}?view=standings`)]
+              ]
+            }
+          }
+        ).catch(() => {});
+      } else {
+        // Only one player confirmed, waiting for the opponent
+        db.prepare(`
+          UPDATE matches
+          SET status = 'submitted',
+              home_confirmed = ?,
+              away_confirmed = ?,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(newHomeConfirmed, newAwayConfirmed, matchId);
+
+        const { broadcastMatchEvent } = require('./services/websocket');
+        broadcastMatchEvent(matchId, {
+          status: 'submitted',
+          home_score: match.home_score,
+          away_score: match.away_score,
+          home_confirmed: newHomeConfirmed,
+          away_confirmed: newAwayConfirmed
+        });
+
+        const pendingPlayerName = newHomeConfirmed === 0 ? match.home_name : match.away_name;
+        await ctx.answerCbQuery(`✅ Siz tasdiqladingiz! ${pendingPlayerName} tasdig‘i kutilmoqda.`, { show_alert: true });
+        await ctx.editMessageCaption(
+          `⏳ <b>Siz natijani tasdiqladingiz!</b>\n\n` +
+          `Uchrashuv: <b>${match.home_name}</b> vs <b>${match.away_name}</b>\n` +
+          `Hisob: <b>${match.home_score} - ${match.away_score}</b>\n\n` +
+          `⚠️ Ikkinchi o‘yinchi (<b>${pendingPlayerName}</b>) tasdiqlashi kutilmoqda. Jadval ikkala o‘yinchi ham tasdiqlagach yangilanadi.`,
+          {
+            parse_mode: 'HTML',
+            reply_markup: {
+              inline_keyboard: [
+                [createAppButton('📱 Mini App’da ko‘rish', `${config.miniAppUrl}?match_id=${match.id}&view=matches`)]
+              ]
+            }
+          }
+        ).catch(() => {});
+      }
+    } catch (err) {
+      console.error('confirm_match xatoligi:', err);
+      ctx.answerCbQuery('❌ Xatolik yuz berdi.', { show_alert: true }).catch(() => {});
+    }
+  });
+
+  // Callback query: dispute_match_<id>
+  bot.action(/^dispute_match_(\d+)$/, async (ctx) => {
+    try {
+      const matchId = parseInt(ctx.match[1], 10);
+      const telegramId = String(ctx.from.id);
+
+      const match = db.prepare(`
+        SELECT 
+          m.*,
+          h.player_name as home_name, h.telegram_id as home_tg,
+          a.player_name as away_name, a.telegram_id as away_tg
+        FROM matches m
+        JOIN participants h ON m.home_participant_id = h.id
+        JOIN participants a ON m.away_participant_id = a.id
+        WHERE m.id = ?
+      `).get(matchId);
+
+      if (!match) {
+        return ctx.answerCbQuery('❌ Uchrashuv topilmadi.', { show_alert: true });
+      }
+
+      const isHome = match.home_tg === telegramId;
+      const isAway = match.away_tg === telegramId;
+
+      if (!isHome && !isAway) {
+        return ctx.answerCbQuery('⛔ Siz ushbu uchrashuv ishtirokchisi emassiz.', { show_alert: true });
+      }
+
+      const playerName = isHome ? match.home_name : match.away_name;
+      const disputeReason = `${playerName} Telegram bot orqali natijani rad etdi.`;
+
+      db.prepare(`
+        UPDATE matches
+        SET status = 'disputed',
+            dispute_reason = ?,
+            home_confirmed = 0,
+            away_confirmed = 0,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(disputeReason, matchId);
+
+      const { broadcastMatchEvent } = require('./services/websocket');
+      broadcastMatchEvent(matchId, {
+        status: 'disputed',
+        reason: disputeReason
+      });
+
+      if (config.adminId && config.adminId.length > 0) {
+        const { sendTelegramNotification } = require('./services/botNotifier');
+        for (const aId of config.adminId) {
+          sendTelegramNotification(
+            aId,
+            `⚠️ <b>Uchrashuv natijasi rad etildi!</b>\n\n` +
+            `⚔️ <b>${match.home_name}</b> vs <b>${match.away_name}</b>\n` +
+            `Rad etuvchi: <b>${playerName}</b>\n` +
+            `Holat: Admin ko‘rib chiqishi kutilmoqda.`,
+            {
+              inline_keyboard: [
+                [createAppButton('⚙️ Admin panelda ko‘rish', `${config.miniAppUrl}?view=admin`)]
+              ]
+            }
+          ).catch(() => {});
+        }
+      }
+
+      await ctx.answerCbQuery('❌ Natija rad etildi. Admin ko‘rib chiqishi uchun yuborildi.', { show_alert: true });
+      await ctx.editMessageCaption(
+        `❌ <b>Siz ushbu hisobni rad etdingiz.</b>\n\n` +
+        `Uchrashuv: <b>${match.home_name}</b> vs <b>${match.away_name}</b>\n` +
+        `Holati: <b>Ko‘rib chiqilmoqda (Nizo)</b>\n\n` +
+        `Admin natijani va skrinshotni qayta ko‘rib chiqadi. Turnir jadvali o‘zgarmaydi.`,
+        {
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [
+              [createAppButton('📱 Mini App’ni ochish', `${config.miniAppUrl}?match_id=${match.id}&view=matches`)]
+            ]
+          }
+        }
+      ).catch(() => {});
+    } catch (err) {
+      console.error('dispute_match xatoligi:', err);
+      ctx.answerCbQuery('❌ Xatolik yuz berdi.', { show_alert: true }).catch(() => {});
+    }
+  });
+
   // Listen to photo uploads sent directly to the bot
   bot.on('photo', async (ctx) => {
     const telegramId = String(ctx.from.id);

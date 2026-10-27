@@ -272,49 +272,103 @@ router.post('/confirm/:id', async (req, res) => {
       return res.status(403).json({ success: false, message: 'Faqat uchrashuv ishtirokchisi tasdiqlay oladi.' });
     }
 
-    // Set match as finished
-    db.prepare(`
-      UPDATE matches
-      SET status = 'finished',
-          home_confirmed = 1,
-          away_confirmed = 1,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(matchId);
-
-    // Settle prediction points if table exists
-    try {
-      settlePredictions(matchId, match.home_score, match.away_score);
-    } catch (e) {}
-
-    // Notify BOTH players that result is officially confirmed
-    const { notifyResultConfirmed } = require('../services/botNotifier');
-    const scoreText = `${match.home_score} - ${match.away_score}`;
-    await notifyResultConfirmed(match.home_tg, match.away_tg, match.home_name, match.away_name, scoreText);
-
-    // Broadcast match finished & standings update
-    broadcastMatchEvent(matchId, {
-      status: 'finished',
-      home_score: match.home_score,
-      away_score: match.away_score
-    });
-    broadcast({ type: 'standings_updated', leagueId: match.league_id });
-
-    // Check if current round is complete and automatically advance!
-    const advanceInfo = checkAndAdvanceRound(match.league_id);
-    let successMsg = 'Uchrashuv natijasi rasman tasdiqlandi va turnir jadvaliga qo‘shildi!';
-    if (advanceInfo?.advanced) {
-      successMsg += ` ${match.round}-turning barcha o‘yinlari yakunlandi, ${advanceInfo.newRound}-tur avtomatik ochildi!`;
+    if (match.status === 'finished') {
+      return res.json({ success: true, bothConfirmed: true, message: 'Ushbu uchrashuv allaqachon tasdiqlangan va yakunlangan.', status: 'finished' });
     }
 
-    res.json({
-      success: true,
-      message: successMsg,
-      matchId,
-      status: 'finished',
-      roundAdvanced: Boolean(advanceInfo?.advanced),
-      newRound: advanceInfo?.newRound || null
-    });
+    let newHomeConfirmed = match.home_confirmed;
+    let newAwayConfirmed = match.away_confirmed;
+
+    if (req.isAdmin) {
+      newHomeConfirmed = 1;
+      newAwayConfirmed = 1;
+    } else {
+      if (isHome) newHomeConfirmed = 1;
+      if (isAway) newAwayConfirmed = 1;
+    }
+
+    const bothConfirmed = (newHomeConfirmed === 1 && newAwayConfirmed === 1);
+
+    if (bothConfirmed) {
+      // Both participants confirmed! Finalize match, settle predictions, and update standings
+      db.prepare(`
+        UPDATE matches
+        SET status = 'finished',
+            home_confirmed = 1,
+            away_confirmed = 1,
+            dispute_reason = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(matchId);
+
+      // Settle prediction points if table exists
+      try {
+        settlePredictions(matchId, match.home_score, match.away_score);
+      } catch (e) {}
+
+      // Notify BOTH players that result is officially confirmed
+      const { notifyResultConfirmed } = require('../services/botNotifier');
+      const scoreText = `${match.home_score} - ${match.away_score}`;
+      await notifyResultConfirmed(match.home_tg, match.away_tg, match.home_name, match.away_name, scoreText);
+
+      // Broadcast match finished & standings update
+      broadcastMatchEvent(matchId, {
+        status: 'finished',
+        home_score: match.home_score,
+        away_score: match.away_score,
+        home_confirmed: 1,
+        away_confirmed: 1
+      });
+      broadcast({ type: 'standings_updated', leagueId: match.league_id });
+
+      // Check if current round is complete and automatically advance!
+      const advanceInfo = checkAndAdvanceRound(match.league_id);
+      let successMsg = 'Ikkala o‘yinchi ham hisobni tasdiqladi! Natija rasman turnir jadvaliga qo‘shildi.';
+      if (advanceInfo?.advanced) {
+        successMsg += ` ${match.round}-turning barcha o‘yinlari yakunlandi, ${advanceInfo.newRound}-tur avtomatik ochildi!`;
+      }
+
+      return res.json({
+        success: true,
+        bothConfirmed: true,
+        message: successMsg,
+        matchId,
+        status: 'finished',
+        roundAdvanced: Boolean(advanceInfo?.advanced),
+        newRound: advanceInfo?.newRound || null
+      });
+
+    } else {
+      // One player confirmed, waiting for the other. DO NOT update standings yet!
+      db.prepare(`
+        UPDATE matches
+        SET status = 'submitted',
+            home_confirmed = ?,
+            away_confirmed = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(newHomeConfirmed, newAwayConfirmed, matchId);
+
+      // Broadcast match event to update live UI without touching standings
+      broadcastMatchEvent(matchId, {
+        status: 'submitted',
+        home_score: match.home_score,
+        away_score: match.away_score,
+        home_confirmed: newHomeConfirmed,
+        away_confirmed: newAwayConfirmed
+      });
+
+      const pendingPlayerName = newHomeConfirmed === 0 ? match.home_name : match.away_name;
+      return res.json({
+        success: true,
+        bothConfirmed: false,
+        message: `Siz natijani tasdiqladingiz! Ikkinchi o‘yinchi (${pendingPlayerName}) tasdiqlashi kutilmoqda. Ikkala tomon tasdiqlagach natija turnir jadvaliga qo‘shiladi.`,
+        matchId,
+        status: 'submitted',
+        home_confirmed: newHomeConfirmed,
+        away_confirmed: newAwayConfirmed
+      });
+    }
   } catch (err) {
     console.error('Natijani tasdiqlashda xatolik:', err);
     res.status(500).json({ success: false, error: err.message });
@@ -350,12 +404,15 @@ router.post('/dispute/:id', (req, res) => {
       return res.status(403).json({ success: false, message: 'Faqat ishtirokchilar e\'tiroz bildira oladi.' });
     }
 
-    const disputeReason = reason || 'Ishtirokchi kiritilgan hisob yoki skrinshotga e\'tiroz bildirdi.';
+    const playerName = isHome ? match.home_name : match.away_name;
+    const disputeReason = reason || `${playerName} hisob yoki skrinshotga e'tiroz bildirdi.`;
 
     db.prepare(`
       UPDATE matches
       SET status = 'disputed',
           dispute_reason = ?,
+          home_confirmed = 0,
+          away_confirmed = 0,
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(disputeReason, matchId);

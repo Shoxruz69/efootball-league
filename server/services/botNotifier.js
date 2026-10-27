@@ -183,6 +183,54 @@ async function notifyResultConfirmed(homeTg, awayTg, homeName, awayName, scoreTe
   }
 }
 
+/**
+ * Notify both players when Admin enters/saves match result for dual confirmation
+ */
+async function notifyAdminSubmissionForConfirmation(match, scoreText, screenshotUrl) {
+  const miniAppUrl = config.miniAppUrl;
+  const homeName = match.home_name;
+  const awayName = match.away_name;
+
+  const caption = `⚽ <b>eFootball Liga: Uchrashuv natijasi kiritildi!</b>\n\n` +
+    `Uchrashuv: <b>${homeName}</b> vs <b>${awayName}</b>\n` +
+    `Hisob: <b>${scoreText}</b>\n\n` +
+    `Iltimos, natijani tekshirib, tasdiqlang yoki e'tiroz bildiring.\n` +
+    `<i>⚠️ Natija ikkala o‘yinchi ham tasdiqlagandan so‘ng rasman turnir jadvaliga qo‘shiladi.</i>`;
+
+  const markup = {
+    inline_keyboard: [
+      [
+        { text: '✅ Hisobni tasdiqlash', callback_data: `confirm_match_${match.id}` },
+        { text: '❌ Rad etish', callback_data: `dispute_match_${match.id}` }
+      ],
+      [
+        createAppButton('📱 Mini App’da to‘liq ko‘rish', `${miniAppUrl}?match_id=${match.id}&view=matches`)
+      ]
+    ]
+  };
+
+  // 1. Send to Home player
+  if (match.home_tg) {
+    await sendTelegramPhoto(match.home_tg, screenshotUrl, caption, markup);
+  }
+
+  // 2. Send to Away player
+  if (match.away_tg) {
+    await sendTelegramPhoto(match.away_tg, screenshotUrl, caption, markup);
+  }
+
+  // 3. Group notification if configured
+  const groupId = process.env.TELEGRAM_GROUP_ID;
+  if (groupId && botInstance) {
+    try {
+      const groupCaption = `📢 <b>${match.round}-Tur natijasi kiritildi:</b>\n` +
+        `⚔️ <b>${homeName}</b> ${scoreText} <b>${awayName}</b>\n` +
+        `⏳ <i>Ikkala o‘yinchi tasdig‘i kutilmoqda</i>`;
+      await sendTelegramPhoto(groupId, screenshotUrl, groupCaption);
+    } catch (gErr) {}
+  }
+}
+
 module.exports = {
   setBotInstance,
   createAppButton,
@@ -190,6 +238,7 @@ module.exports = {
   sendTelegramPhoto,
   notifyBothPlayersOfResult,
   notifyMatchReminder,
-  notifyResultConfirmed
+  notifyResultConfirmed,
+  notifyAdminSubmissionForConfirmation
 };
 
