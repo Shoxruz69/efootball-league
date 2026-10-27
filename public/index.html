@@ -13,9 +13,25 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-  <!-- Stylesheets -->
-  <link rel="stylesheet" href="css/style.css">
-  <link rel="stylesheet" href="css/animations.css">
+  <!-- Stylesheets with Cache Busting -->
+  <link rel="stylesheet" href="css/style.css?v=20261027_03">
+  <link rel="stylesheet" href="css/animations.css?v=20261027_03">
+
+  <style>
+    .view-standings-active,
+    .app-container.view-standings-active,
+    body.view-standings-active .app-container {
+      background-color: #286025 !important;
+      background-image: url('assets/pitch.png') !important;
+      background-size: cover !important;
+      background-position: center center !important;
+      background-repeat: no-repeat !important;
+    }
+    .view-standings-active .top-header,
+    .app-container.view-standings-active .top-header {
+      background: transparent !important;
+    }
+  </style>
 </head>
 <body>
   <div class="app-container view-standings-active" id="appContainer">

@@ -19,6 +19,10 @@ const StandingsView = {
   currentStandings: [],
 
   async render(container) {
+    const appEl = document.getElementById('appContainer') || document.querySelector('.app-container');
+    if (appEl) appEl.classList.add('view-standings-active');
+    document.body.classList.add('view-standings-active');
+
     container.innerHTML = `
       <section class="view-section">
         <div class="view-header">

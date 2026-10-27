@@ -52,10 +52,15 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static frontend Mini App
+// Serve static frontend Mini App (no-cache for HTML/CSS/JS so Telegram WebView updates immediately)
 app.use(express.static(path.join(__dirname, '..', 'public'), {
-  maxAge: '1h',
-  etag: true
+  maxAge: 0,
+  etag: true,
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html') || filePath.endsWith('.css') || filePath.endsWith('.js')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    }
+  }
 }));
 
 // Serve uploaded screenshots
