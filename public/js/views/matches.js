@@ -821,6 +821,8 @@ const MatchesView = {
         if (uploadRes && uploadRes.screenshotUrl) {
           screenshotUrl = uploadRes.screenshotUrl;
         }
+      }
+
       if (saveBtn) saveBtn.textContent = 'Baza yangilanmoqda...';
 
       // 2. Save directly via verified Admin API
