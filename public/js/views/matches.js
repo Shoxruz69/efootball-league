@@ -290,11 +290,13 @@ const MatchesView = {
     this.selectedFile = null;
     this.selectedFileUrl = null;
     this.uploadState = 'idle';
+    this.adminSelectedFile = null;
 
     try {
       const res = await API.getMatch(matchId);
       const match = res.match;
       if (!match) return;
+      this.currentMatch = match;
 
       const currentUser = window.App?.currentUser;
       const myTgId = String(currentUser?.telegram_id || window.TelegramService?.getUser()?.id || '');
@@ -306,31 +308,221 @@ const MatchesView = {
       const activeRound = this.activeCurrentRound || 1;
       const isRoundLocked = match.status !== 'finished' && parseInt(match.round, 10) > activeRound;
 
+      // Cryptographically and session-verified admin check
+      let isAdmin = Boolean(window.App?.isAdmin);
+      if (!isAdmin) {
+        try {
+          const auth = await API.checkAdminAuth();
+          if (auth && auth.isAdmin) {
+            isAdmin = true;
+            if (window.App) window.App.isAdmin = true;
+          }
+        } catch (e) {}
+      }
+
       let modalContent = '';
 
-      // CASE 1: MATCH IS FINISHED (Viewable by everyone)
-      if (match.status === 'finished') {
+      // =========================================================================
+      // CASE A: ADMIN REJIMI (Admin istalgan o'yin natijasi, skrinshoti va statistikasini tahrirlay oladi)
+      // =========================================================================
+      if (isAdmin) {
+        const homeScoreVal = match.home_score !== null && match.home_score !== undefined ? match.home_score : 0;
+        const awayScoreVal = match.away_score !== null && match.away_score !== undefined ? match.away_score : 0;
+        const hasScreenshot = Boolean(match.screenshot_url);
+
         modalContent = `
-          <div class="modal-icon-wrap" style="color: var(--win); background: #e8fbf2;">
+          <div class="modal-icon-wrap" style="color: var(--cyan); background: rgba(0, 229, 255, 0.12);">
+            <svg class="i" viewBox="0 0 24 24">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 4px;">
+            <span style="font-size: 11px; font-weight: 700; color: var(--cyan); background: rgba(0, 229, 255, 0.15); padding: 2px 8px; border-radius: 6px; text-transform: uppercase;">
+              Admin Huquqi
+            </span>
+            <span style="font-size: 11px; color: var(--muted);">
+              ${match.round}-tur uchrashuvi
+            </span>
+          </div>
+          <h3 style="color: #ffffff; margin-bottom: 4px;">Uchrashuv tafsilotlari</h3>
+          <p style="font-size: 13px; color: var(--muted); margin-bottom: 14px;">
+            Hisob, skrinshot va o‘yin statistikasini to‘g‘ridan-to‘g‘ri tahrirlashingiz mumkin.
+          </p>
+
+          <form id="adminMatchForm" onsubmit="event.preventDefault(); MatchesView.saveAdminMatch(${match.id});">
+            <!-- 1. Hisob kiritish -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; text-align: left;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" style="font-size: 11.5px; color: #ffffff; font-weight: 600;">
+                  ${this.escape(match.home_player_name)}:
+                </label>
+                <input 
+                  type="number" 
+                  id="adminHomeScore" 
+                  class="form-control" 
+                  min="0" 
+                  max="99" 
+                  value="${homeScoreVal}" 
+                  required 
+                  style="background: #0d0d12; border: 1px solid rgba(255,255,255,0.15); color: #ffffff; border-radius: 8px; padding: 8px; font-size: 16px; font-weight: 700; text-align: center;"
+                  oninput="MatchesView.updateAdminScorePreview('${this.escape(match.home_player_name)}', '${this.escape(match.away_player_name)}')"
+                />
+              </div>
+
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" style="font-size: 11.5px; color: #ffffff; font-weight: 600;">
+                  ${this.escape(match.away_player_name)}:
+                </label>
+                <input 
+                  type="number" 
+                  id="adminAwayScore" 
+                  class="form-control" 
+                  min="0" 
+                  max="99" 
+                  value="${awayScoreVal}" 
+                  required 
+                  style="background: #0d0d12; border: 1px solid rgba(255,255,255,0.15); color: #ffffff; border-radius: 8px; padding: 8px; font-size: 16px; font-weight: 700; text-align: center;"
+                  oninput="MatchesView.updateAdminScorePreview('${this.escape(match.home_player_name)}', '${this.escape(match.away_player_name)}')"
+                />
+              </div>
+            </div>
+
+            <!-- Live Score Preview -->
+            <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 8px; margin-bottom: 12px; text-align: center;">
+              <div style="font-size: 26px; font-weight: 700; color: #ffffff; letter-spacing: 2px;" id="adminScorePreview">
+                ${homeScoreVal} - ${awayScoreVal}
+              </div>
+              <div style="font-size: 12px; color: var(--muted);" id="adminTeamsPreview">
+                ${this.escape(match.home_player_name)} (${homeScoreVal}) — (${awayScoreVal}) ${this.escape(match.away_player_name)}
+              </div>
+            </div>
+
+            <!-- 2. Skrinshot -->
+            <div class="form-group" style="margin-bottom: 12px; text-align: left;">
+              <label class="form-label" style="font-size: 12px; color: #ffffff; display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span>Biriktirilgan skrinshot:</span>
+                ${hasScreenshot ? '<span style="color: var(--cyan); font-size: 11px;">Mavjud rasm saqlangan</span>' : '<span style="color: var(--muted); font-size: 11px;">Rasm yo‘q</span>'}
+              </label>
+
+              ${hasScreenshot ? `
+                <div id="adminExistingScreenshotBox" style="margin-bottom: 8px;">
+                  <img 
+                    src="${this.escape(match.screenshot_url)}" 
+                    id="adminCurrentImg"
+                    class="screenshot-preview-thumb" 
+                    alt="Skrinshot" 
+                    style="max-height: 140px; width: 100%; object-fit: contain; background: #000; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12); cursor: pointer; display: block;" 
+                    onclick="ProfileView?.openScreenshotModal ? ProfileView.openScreenshotModal('${this.escape(match.screenshot_url)}') : window.open('${this.escape(match.screenshot_url)}', '_blank')"
+                  />
+                </div>
+              ` : ''}
+
+              <div class="upload-dropzone" id="adminDropArea" onclick="document.getElementById('adminMatchFile').click()" style="padding: 10px; min-height: 48px; border: 1px dashed rgba(255,255,255,0.2); border-radius: 8px; cursor: pointer; text-align: center; background: rgba(255,255,255,0.02);">
+                <input 
+                  type="file" 
+                  id="adminMatchFile" 
+                  accept="image/jpeg,image/png,image/webp" 
+                  style="display:none;" 
+                  onchange="MatchesView.onAdminFileSelect(event)" 
+                />
+                <div id="adminDropContent">
+                  <div style="font-size: 12px; font-weight: 600; color: var(--cyan);">
+                    ${hasScreenshot ? 'Boshqa skrinshot tanlash (almashtirish)' : 'Yangi skrinshot tanlash'}
+                  </div>
+                  <div style="font-size: 10.5px; color: var(--muted);">JPG, PNG yoki WebP</div>
+                </div>
+                <img id="adminFilePreviewImg" class="screenshot-preview-thumb" style="display:none; max-height: 140px; width: 100%; object-fit: contain; margin-top: 6px; background: #000; border-radius: 8px;" />
+              </div>
+            </div>
+
+            <!-- 3. Gollar statistikasi (Zarbalar va to'p nazorati) -->
+            <details style="margin-bottom: 12px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 8px 12px; text-align: left;">
+              <summary style="font-size: 12px; font-weight: 600; color: #ffffff; cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center;">
+                <span>Gollar va o‘yin statistikasi</span>
+                <span style="font-size: 11px; color: var(--cyan);">Ochish ▾</span>
+              </summary>
+              <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                  <div>
+                    <label style="font-size: 10.5px; color: var(--muted);">${this.escape(match.home_player_name)} to‘p nazorati (%):</label>
+                    <input type="number" id="adminHomePossession" class="form-control" min="0" max="100" value="${match.stats?.possession ? match.stats.possession[0] : 50}" style="background: #0d0d12; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 6px 8px; border-radius: 6px;" />
+                  </div>
+                  <div>
+                    <label style="font-size: 10.5px; color: var(--muted);">${this.escape(match.away_player_name)} to‘p nazorati (%):</label>
+                    <input type="number" id="adminAwayPossession" class="form-control" min="0" max="100" value="${match.stats?.possession ? match.stats.possession[1] : 50}" style="background: #0d0d12; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 6px 8px; border-radius: 6px;" />
+                  </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                  <div>
+                    <label style="font-size: 10.5px; color: var(--muted);">${this.escape(match.home_player_name)} zarbalari:</label>
+                    <input type="number" id="adminHomeShots" class="form-control" min="0" max="99" value="${match.stats?.shots ? match.stats.shots[0] : ''}" placeholder="0" style="background: #0d0d12; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 6px 8px; border-radius: 6px;" />
+                  </div>
+                  <div>
+                    <label style="font-size: 10.5px; color: var(--muted);">${this.escape(match.away_player_name)} zarbalari:</label>
+                    <input type="number" id="adminAwayShots" class="form-control" min="0" max="99" value="${match.stats?.shots ? match.stats.shots[1] : ''}" placeholder="0" style="background: #0d0d12; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 6px 8px; border-radius: 6px;" />
+                  </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                  <div>
+                    <label style="font-size: 10.5px; color: var(--muted);">${this.escape(match.home_player_name)} aniq zarbalari:</label>
+                    <input type="number" id="adminHomeOnTarget" class="form-control" min="0" max="99" value="${match.stats?.shotsOnTarget ? match.stats.shotsOnTarget[0] : ''}" placeholder="0" style="background: #0d0d12; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 6px 8px; border-radius: 6px;" />
+                  </div>
+                  <div>
+                    <label style="font-size: 10.5px; color: var(--muted);">${this.escape(match.away_player_name)} aniq zarbalari:</label>
+                    <input type="number" id="adminAwayOnTarget" class="form-control" min="0" max="99" value="${match.stats?.shotsOnTarget ? match.stats.shotsOnTarget[1] : ''}" placeholder="0" style="background: #0d0d12; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 6px 8px; border-radius: 6px;" />
+                  </div>
+                </div>
+              </div>
+            </details>
+
+            <!-- 4. Uchrashuv holati (Status) -->
+            <div class="form-group" style="margin-bottom: 14px; text-align: left;">
+              <label class="form-label" style="font-size: 12px; color: #ffffff;">Uchrashuv holati:</label>
+              <select id="adminMatchStatus" class="form-control" style="background: #0d0d12; border: 1px solid rgba(255,255,255,0.15); color: #ffffff; padding: 8px 10px; border-radius: 8px;">
+                <option value="finished" ${match.status === 'finished' ? 'selected' : ''}>Yakunlangan (Tasdiqlash va Jadvalga kiritish)</option>
+                <option value="submitted" ${match.status === 'submitted' ? 'selected' : ''}>Kiritilgan (Tasdiqlash kutilmoqda)</option>
+                <option value="scheduled" ${match.status === 'scheduled' ? 'selected' : ''}>Kutilmoqda (O‘ynalmagan / Tiklash)</option>
+              </select>
+            </div>
+
+            <!-- Tugmalar -->
+            <div style="display: flex; gap: 10px;">
+              <button type="submit" id="adminSaveMatchBtn" class="pill on" style="flex: 1; background: linear-gradient(135deg, #00b4db, #0083b0); font-weight: 700;">
+                Natijani saqlash
+              </button>
+              <button type="button" class="pill" onclick="MatchesView.closeModal()" style="padding: 0 16px;">
+                Yopish
+              </button>
+            </div>
+          </form>
+        `;
+      }
+      // =========================================================================
+      // CASE B: ODDIY O'YINCHILAR REJIMI (Faqat o'zlari qatnashgan o'yinlarni kiritish)
+      // =========================================================================
+      // CASE 1: MATCH IS FINISHED (Viewable by everyone)
+      else if (match.status === 'finished') {
+        modalContent = `
+          <div class="modal-icon-wrap" style="color: var(--win); background: rgba(45, 224, 138, 0.12);">
             <svg class="i" viewBox="0 0 24 24">
               <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
               <polyline points="22 4 12 14.01 9 11.01"/>
             </svg>
           </div>
-          <h3>Uchrashuv yakunlangan</h3>
-          <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">
+          <h3 style="color: #ffffff;">Uchrashuv yakunlangan</h3>
+          <div style="font-size: 13px; color: var(--muted); margin-bottom: 8px;">
             ${match.round}-tur rasmiy natijasi
           </div>
-          <div style="font-size: 32px; font-weight: 700; color: var(--text); letter-spacing: 2px; margin: 8px 0;">
+          <div style="font-size: 32px; font-weight: 700; color: #ffffff; letter-spacing: 2px; margin: 8px 0;">
             ${match.home_score} - ${match.away_score}
           </div>
-          <p style="font-size: 14px; color: var(--text-secondary);">
+          <p style="font-size: 14px; color: var(--muted);">
             ${this.escape(match.home_player_name)} vs ${this.escape(match.away_player_name)}
           </p>
           ${match.screenshot_url ? `
             <div style="text-align: left; margin: 12px 0;">
-              <label class="form-label">Yuklangan skrinshot:</label>
-              <img src="${match.screenshot_url}" class="screenshot-preview-thumb" alt="Skrinshot" onclick="window.open('${this.escape(match.screenshot_url)}', '_blank')" />
+              <label class="form-label" style="color: #ffffff;">Yuklangan skrinshot:</label>
+              <img src="${match.screenshot_url}" class="screenshot-preview-thumb" alt="Skrinshot" style="max-height: 180px; width: 100%; object-fit: contain; background: #000; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); cursor: pointer;" onclick="ProfileView?.openScreenshotModal ? ProfileView.openScreenshotModal('${this.escape(match.screenshot_url)}') : window.open('${this.escape(match.screenshot_url)}', '_blank')" />
             </div>
           ` : ''}
           <button class="pill on" onclick="MatchesView.closeModal()" type="button" style="width: 100%; margin-top: 10px;">
@@ -348,7 +540,7 @@ const MatchesView = {
               <path d="M8 11V8a4 4 0 0 1 8 0v3"/>
             </svg>
           </div>
-          <h3>Ushbu tur hali ochilmagan</h3>
+          <h3 style="color: #ffffff;">Ushbu tur hali ochilmagan</h3>
           <p style="font-size: 13.5px; color: var(--muted); margin-bottom: 12px;">
             ${match.round}-turga natija kiritish yopiq. Hozirgi <b>${activeRound}-tur</b>dagi barcha o‘yinlar to'liq o'ynalib, tasdiqlangach tizim bu turni avtomatik ochadi.
           </p>
@@ -373,14 +565,14 @@ const MatchesView = {
       // CASE 3: USER IS NOT ONE OF THE TWO PARTICIPANTS
       else if (!isParticipant) {
         modalContent = `
-          <div class="modal-icon-wrap">
+          <div class="modal-icon-wrap" style="color: var(--muted); background: rgba(255, 255, 255, 0.05);">
             <svg class="i" viewBox="0 0 24 24">
               <rect x="5" y="11" width="14" height="10" rx="2"/>
               <path d="M8 11V8a4 4 0 0 1 8 0v3"/>
             </svg>
           </div>
-          <h3>Uchrashuv tafsilotlari</h3>
-          <p>
+          <h3 style="color: #ffffff;">Uchrashuv tafsilotlari</h3>
+          <p style="color: var(--muted);">
             Ushbu natijani faqat unda qatnashuvchi ikki o'yinchi — <b>${this.escape(match.home_player_name)}</b> yoki <b>${this.escape(match.away_player_name)}</b> kirita oladi.
           </p>
           <button class="pill on" onclick="MatchesView.closeModal()" type="button" style="width: 100%; margin-top: 14px;">
@@ -395,23 +587,23 @@ const MatchesView = {
 
         if (iAmUploader) {
           modalContent = `
-            <div class="modal-icon-wrap" style="color: #ff9800; background: #fff8eb;">
+            <div class="modal-icon-wrap" style="color: #ff9800; background: rgba(255, 152, 0, 0.1);">
               <svg class="i" viewBox="0 0 24 24">
                 <circle cx="12" cy="12" r="10"/>
                 <polyline points="12 6 12 12 16 14"/>
               </svg>
             </div>
-            <h3>Tasdiqlash kutilmoqda</h3>
-            <div style="font-size: 30px; font-weight: 700; color: var(--text); margin: 6px 0;">
+            <h3 style="color: #ffffff;">Tasdiqlash kutilmoqda</h3>
+            <div style="font-size: 30px; font-weight: 700; color: #ffffff; margin: 6px 0;">
               ${match.home_score} - ${match.away_score}
             </div>
-            <p>
+            <p style="color: var(--muted);">
               Siz kiritgan hisob yuborildi. Raqibingiz (<b>${this.escape(isHome ? match.away_player_name : match.home_player_name)}</b>) tasdiqlashi kutilmoqda.
             </p>
             ${match.screenshot_url ? `
               <div style="text-align: left; margin: 12px 0;">
-                <label class="form-label">Yuklangan skrinshot:</label>
-                <img src="${match.screenshot_url}" class="screenshot-preview-thumb" alt="Skrinshot" />
+                <label class="form-label" style="color: #ffffff;">Yuklangan skrinshot:</label>
+                <img src="${match.screenshot_url}" class="screenshot-preview-thumb" alt="Skrinshot" style="max-height: 180px; width: 100%; object-fit: contain; background: #000; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);" />
               </div>
             ` : ''}
             <button class="pill on" onclick="MatchesView.closeModal()" type="button" style="width: 100%;">
@@ -421,26 +613,26 @@ const MatchesView = {
         } else {
           // Opponent sees the result and can Confirm or Dispute
           modalContent = `
-            <div class="modal-icon-wrap" style="color: var(--blue); background: #eef5ff;">
+            <div class="modal-icon-wrap" style="color: var(--cyan); background: rgba(25, 201, 255, 0.1);">
               <svg class="i" viewBox="0 0 24 24">
                 <rect x="4" y="3" width="16" height="18" rx="2"/>
                 <path d="M8 8h8M8 12h8M8 16h5"/>
               </svg>
             </div>
-            <h3>Natijani tasdiqlash</h3>
-            <div style="background: #f2f4f8; border-radius: 12px; padding: 12px; margin: 10px 0;">
-              <div style="font-size: 12px; color: var(--text-secondary);">Raqib kiritgan hisob:</div>
-              <div style="font-size: 32px; font-weight: 700; color: var(--text); letter-spacing: 2px; margin: 4px 0;">
+            <h3 style="color: #ffffff;">Natijani tasdiqlash</h3>
+            <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 12px; margin: 10px 0;">
+              <div style="font-size: 12px; color: var(--muted);">Raqib kiritgan hisob:</div>
+              <div style="font-size: 32px; font-weight: 700; color: #ffffff; letter-spacing: 2px; margin: 4px 0;">
                 ${match.home_score} - ${match.away_score}
               </div>
-              <div style="font-size: 13px; font-weight: 500; color: var(--text-secondary);">
+              <div style="font-size: 13px; font-weight: 500; color: var(--muted);">
                 ${this.escape(match.home_player_name)} vs ${this.escape(match.away_player_name)}
               </div>
             </div>
             ${match.screenshot_url ? `
               <div style="text-align: left; margin: 12px 0;">
-                <label class="form-label">Raqib yuklagan skrinshot:</label>
-                <img src="${match.screenshot_url}" class="screenshot-preview-thumb" alt="Skrinshot" />
+                <label class="form-label" style="color: #ffffff;">Raqib yuklagan skrinshot:</label>
+                <img src="${match.screenshot_url}" class="screenshot-preview-thumb" alt="Skrinshot" style="max-height: 180px; width: 100%; object-fit: contain; background: #000; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);" />
               </div>
             ` : ''}
             <div style="display: flex; gap: 10px; margin-top: 16px;">
@@ -454,27 +646,27 @@ const MatchesView = {
           `;
         }
       }
-      // CASE 4: SCHEDULED / DISPUTED - SCORE ENTRY FORM
+      // CASE 5: SCHEDULED / DISPUTED - SCORE ENTRY FORM
       else {
         modalContent = `
-          <div class="modal-icon-wrap">
+          <div class="modal-icon-wrap" style="color: var(--cyan); background: rgba(25, 201, 255, 0.1);">
             <svg class="i" viewBox="0 0 24 24">
               <path d="M12 5v14M5 12h14"/>
             </svg>
           </div>
-          <h3>Natija kiritish</h3>
-          <p style="margin-bottom: 12px;">
+          <h3 style="color: #ffffff;">Natija kiritish</h3>
+          <p style="margin-bottom: 12px; color: var(--muted);">
             ${this.escape(match.home_player_name)} <span style="color: var(--muted); font-size: 12px;">vs</span> ${this.escape(match.away_player_name)}<br>
-            <span style="font-size: 12px; color: var(--blue); font-weight: 600;">
+            <span style="font-size: 12px; color: var(--cyan); font-weight: 600;">
               Siz: ${this.escape(myName)} (${isHome ? 'Mezbon' : 'Mehmon'})
             </span>
           </p>
 
           <form id="matchEntryForm" onsubmit="MatchesView.submitResult(event, ${match.id}, ${isHome})">
             <!-- 1. Screenshot Upload with Dropzone / Shimmer -->
-            <div class="form-group">
-              <label class="form-label">1. O'yin skrinshoti (Majburiy):</label>
-              <div class="upload-dropzone" id="uploadDropArea" onclick="document.getElementById('matchScreenshotFile').click()">
+            <div class="form-group" style="text-align: left;">
+              <label class="form-label" style="color: #ffffff;">1. O'yin skrinshoti (Majburiy):</label>
+              <div class="upload-dropzone" id="uploadDropArea" onclick="document.getElementById('matchScreenshotFile').click()" style="border: 1px dashed rgba(255,255,255,0.2); border-radius: 8px; cursor: pointer; text-align: center; background: rgba(255,255,255,0.02); padding: 12px;">
                 <input 
                   type="file" 
                   id="matchScreenshotFile" 
@@ -484,26 +676,26 @@ const MatchesView = {
                   onchange="MatchesView.onFileSelect(event)" 
                 />
                 <div id="dropzoneContent">
-                  <svg class="i" viewBox="0 0 24 24" style="width: 28px; height: 28px; color: var(--blue); margin-bottom: 6px;">
+                  <svg class="i" viewBox="0 0 24 24" style="width: 28px; height: 28px; color: var(--cyan); margin-bottom: 6px;">
                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
                     <circle cx="8.5" cy="8.5" r="1.5"/>
                     <polyline points="21 15 16 10 5 21"/>
                   </svg>
-                  <div style="font-size: 13.5px; font-weight: 600; color: var(--text);">Skrinshotni tanlang</div>
-                  <div style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px;">JPG, PNG yoki WebP</div>
+                  <div style="font-size: 13.5px; font-weight: 600; color: #ffffff;">Skrinshotni tanlang</div>
+                  <div style="font-size: 11.5px; color: var(--muted); margin-top: 2px;">JPG, PNG yoki WebP</div>
                 </div>
                 <div id="uploadLoadingArea" style="display:none; padding: 10px 0;">
                   <div class="spinner"></div>
-                  <div style="font-size: 12px; color: var(--blue); font-weight: 600;">Skrinshot yuklanmoqda...</div>
+                  <div style="font-size: 12px; color: var(--cyan); font-weight: 600;">Skrinshot yuklanmoqda...</div>
                 </div>
-                <img id="filePreviewImg" class="screenshot-preview-thumb" style="display:none;" />
+                <img id="filePreviewImg" class="screenshot-preview-thumb" style="display:none; max-height: 160px; width: 100%; object-fit: contain; background: #000; border-radius: 8px;" />
               </div>
             </div>
 
             <!-- 2. Goals Entry: Men urgan va Men o'tkazgan -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; text-align: left;">
               <div class="form-group" style="margin-bottom: 0;">
-                <label class="form-label">Men urgan gollar:</label>
+                <label class="form-label" style="color: #ffffff;">Men urgan gollar:</label>
                 <input 
                   type="number" 
                   id="myGoalsInput" 
@@ -512,12 +704,13 @@ const MatchesView = {
                   max="99" 
                   value="0" 
                   required 
+                  style="background: #0d0d12; border: 1px solid rgba(255,255,255,0.15); color: #ffffff; border-radius: 8px; padding: 8px; font-size: 16px; font-weight: 700; text-align: center;"
                   oninput="MatchesView.updateLivePreview(${isHome}, '${this.escape(match.home_player_name)}', '${this.escape(match.away_player_name)}')"
                 />
               </div>
 
               <div class="form-group" style="margin-bottom: 0;">
-                <label class="form-label">Men o'tkazgan:</label>
+                <label class="form-label" style="color: #ffffff;">Men o'tkazgan:</label>
                 <input 
                   type="number" 
                   id="oppGoalsInput" 
@@ -526,20 +719,21 @@ const MatchesView = {
                   max="99" 
                   value="0" 
                   required 
+                  style="background: #0d0d12; border: 1px solid rgba(255,255,255,0.15); color: #ffffff; border-radius: 8px; padding: 8px; font-size: 16px; font-weight: 700; text-align: center;"
                   oninput="MatchesView.updateLivePreview(${isHome}, '${this.escape(match.home_player_name)}', '${this.escape(match.away_player_name)}')"
                 />
               </div>
             </div>
 
             <!-- 3. Live Score Preview -->
-            <div style="background: #f2f4f8; border-radius: 12px; padding: 10px; margin-bottom: 14px; text-align: center;">
-              <div style="font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">
+            <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 10px; margin-bottom: 14px; text-align: center;">
+              <div style="font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase;">
                 Hisob ko'rinishi
               </div>
-              <div style="font-size: 26px; font-weight: 700; color: var(--text); letter-spacing: 2px; margin: 2px 0;" id="liveScorePreview">
+              <div style="font-size: 26px; font-weight: 700; color: #ffffff; letter-spacing: 2px; margin: 2px 0;" id="liveScorePreview">
                 0 - 0
               </div>
-              <div style="font-size: 12px; color: var(--text-secondary);" id="liveTeamsPreview">
+              <div style="font-size: 12px; color: var(--muted);" id="liveTeamsPreview">
                 ${this.escape(match.home_player_name)} (0) — (${match.away_player_name}) (0)
               </div>
             </div>
@@ -554,7 +748,7 @@ const MatchesView = {
 
       const modalHtml = `
         <div class="modal-overlay" id="matchDetailModal" onclick="if(event.target===this) MatchesView.closeModal()">
-          <div class="modal-dialog">
+          <div class="modal-dialog dark-modal-dialog" style="max-width: 440px; width: 92%; padding: 20px 16px; background: #16161c; border: 1px solid rgba(255, 255, 255, 0.12); color: #ffffff; border-radius: 18px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8);">
             ${modalContent}
           </div>
         </div>
@@ -565,6 +759,111 @@ const MatchesView = {
 
     } catch (err) {
       alert("Uchrashuv ma'lumotlarini yuklab bo'lmadi: " + (err.message || 'Xatolik'));
+    }
+  },
+
+  onAdminFileSelect(event) {
+    const file = event.target.files[0];
+    if (file) {
+      this.adminSelectedFile = file;
+      const previewImg = document.getElementById('adminFilePreviewImg');
+      const dropContent = document.getElementById('adminDropContent');
+      if (previewImg) {
+        previewImg.src = URL.createObjectURL(file);
+        previewImg.style.display = 'block';
+      }
+      if (dropContent) {
+        dropContent.innerHTML = `<span style="font-size: 11.5px; color: #2de08a;">Tanlandi: ${this.escape(file.name)}</span>`;
+      }
+    }
+  },
+
+  updateAdminScorePreview(homeName, awayName) {
+    const h = parseInt(document.getElementById('adminHomeScore')?.value || '0', 10);
+    const a = parseInt(document.getElementById('adminAwayScore')?.value || '0', 10);
+    const scoreEl = document.getElementById('adminScorePreview');
+    const teamsEl = document.getElementById('adminTeamsPreview');
+    if (scoreEl) scoreEl.textContent = `${h} - ${a}`;
+    if (teamsEl) teamsEl.textContent = `${homeName} (${h}) — (${a}) ${awayName}`;
+  },
+
+  async saveAdminMatch(matchId) {
+    const saveBtn = document.getElementById('adminSaveMatchBtn');
+    const homeScoreInput = document.getElementById('adminHomeScore');
+    const awayScoreInput = document.getElementById('adminAwayScore');
+    const statusSelect = document.getElementById('adminMatchStatus');
+
+    const homeScore = parseInt(homeScoreInput?.value || '0', 10);
+    const awayScore = parseInt(awayScoreInput?.value || '0', 10);
+    const status = statusSelect?.value || 'finished';
+
+    if (isNaN(homeScore) || isNaN(awayScore) || homeScore < 0 || awayScore < 0) {
+      alert("Hisob to'g'ri sonlarda kiritilishi shart.");
+      return;
+    }
+
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saqlanmoqda...';
+    }
+
+    try {
+      let screenshotUrl = this.currentMatch?.screenshot_url || null;
+
+      // 1. Upload new screenshot if selected
+      if (this.adminSelectedFile) {
+        if (saveBtn) saveBtn.textContent = 'Skrinshot yuklanmoqda...';
+        const uploadRes = await API.uploadScreenshot(matchId, this.adminSelectedFile);
+        if (uploadRes && uploadRes.screenshotUrl) {
+          screenshotUrl = uploadRes.screenshotUrl;
+        }
+      }
+
+      // 2. Package optional stats
+      let stats = null;
+      const hPoss = parseInt(document.getElementById('adminHomePossession')?.value, 10);
+      const aPoss = parseInt(document.getElementById('adminAwayPossession')?.value, 10);
+      const hShots = parseInt(document.getElementById('adminHomeShots')?.value, 10);
+      const aShots = parseInt(document.getElementById('adminAwayShots')?.value, 10);
+      const hOnTarget = parseInt(document.getElementById('adminHomeOnTarget')?.value, 10);
+      const aOnTarget = parseInt(document.getElementById('adminAwayOnTarget')?.value, 10);
+
+      if (!isNaN(hPoss) || !isNaN(hShots) || !isNaN(hOnTarget)) {
+        stats = {
+          possession: [isNaN(hPoss) ? 50 : hPoss, isNaN(aPoss) ? 50 : aPoss],
+          shots: [isNaN(hShots) ? 0 : hShots, isNaN(aShots) ? 0 : aShots],
+          shotsOnTarget: [isNaN(hOnTarget) ? 0 : hOnTarget, isNaN(aOnTarget) ? 0 : aOnTarget]
+        };
+      }
+
+      if (saveBtn) saveBtn.textContent = 'Baza yangilanmoqda...';
+
+      // 3. Save directly via verified Admin API
+      await API.adminUpdateMatchScore(matchId, {
+        home_score: homeScore,
+        away_score: awayScore,
+        status,
+        screenshot_url: screenshotUrl,
+        stats
+      });
+
+      try { window.TelegramService?.haptic('success'); } catch (e) {}
+
+      this.closeModal();
+      await this.loadMatches();
+      if (window.App && typeof window.App.refreshStandings === 'function') {
+        window.App.refreshStandings();
+      }
+
+      alert("Uchrashuv ma'lumotlari admin tomonidan muvaffaqiyatli saqlandi va turnir jadvali qayta hisoblandi!");
+
+    } catch (err) {
+      try { window.TelegramService?.haptic('error'); } catch (e) {}
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Natijani saqlash';
+      }
+      alert(err.message || "Uchrashuvni saqlashda xatolik yuz berdi");
     }
   },
 

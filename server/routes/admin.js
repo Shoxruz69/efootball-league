@@ -3,7 +3,7 @@ const router = express.Router();
 const crypto = require('crypto');
 const db = require('../db');
 const config = require('../config');
-const { broadcast } = require('../services/websocket');
+const { broadcast, broadcastMatchEvent } = require('../services/websocket');
 const { createAdminSession, destroyAdminSession } = require('../middleware/auth');
 const { generateRoundRobinFixtures, calculateStandings } = require('../services/fixtureGenerator');
 const { checkAndAdvanceRound } = require('../services/roundManager');
@@ -426,37 +426,92 @@ router.post('/start-new-season', (req, res) => {
   }
 });
 
-// 10. Manually edit any match score
+// 10. Manually edit any match score, screenshot, status, and stats
 router.put('/matches/:id', (req, res) => {
   try {
     const matchId = parseInt(req.params.id, 10);
-    const { home_score, away_score, status } = req.body;
+    const { home_score, away_score, status, screenshot_url, stats } = req.body;
 
     const match = db.prepare('SELECT * FROM matches WHERE id = ?').get(matchId);
     if (!match) {
       return res.status(404).json({ success: false, message: 'Uchrashuv topilmadi.' });
     }
 
-    const h = home_score !== undefined && home_score !== null ? parseInt(home_score, 10) : match.home_score;
-    const a = away_score !== undefined && away_score !== null ? parseInt(away_score, 10) : match.away_score;
-    const s = status || match.status;
+    const h = home_score !== undefined && home_score !== null && home_score !== '' ? parseInt(home_score, 10) : match.home_score;
+    const a = away_score !== undefined && away_score !== null && away_score !== '' ? parseInt(away_score, 10) : match.away_score;
+
+    // Status can be explicitly specified or defaults to 'finished' if scores are present
+    let s = status;
+    if (!s) {
+      s = (h !== null && a !== null) ? 'finished' : match.status;
+    }
+
+    const scUrl = screenshot_url !== undefined ? screenshot_url : match.screenshot_url;
+
+    let statsJson = match.stats_json;
+    if (stats !== undefined) {
+      statsJson = typeof stats === 'string' ? stats : JSON.stringify(stats);
+    }
+
+    // When status is finished, mark both participants confirmed
+    const homeConfirmed = s === 'finished' ? 1 : match.home_confirmed;
+    const awayConfirmed = s === 'finished' ? 1 : match.away_confirmed;
 
     db.prepare(`
       UPDATE matches
       SET home_score = ?,
           away_score = ?,
           status = ?,
+          screenshot_url = ?,
+          stats_json = ?,
+          home_confirmed = ?,
+          away_confirmed = ?,
+          dispute_reason = NULL,
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `).run(h, a, s, matchId);
+    `).run(h, a, s, scUrl, statsJson, homeConfirmed, awayConfirmed, matchId);
+
+    // Settle prediction points if finished
+    if (s === 'finished' && h !== null && a !== null) {
+      try {
+        const { settlePredictions } = require('./results');
+        if (typeof settlePredictions === 'function') {
+          settlePredictions(matchId, h, a);
+        }
+      } catch (e) {}
+    }
 
     // Auto-advance round if all matches in round are now finished
     if (s === 'finished') {
       checkAndAdvanceRound(match.league_id);
     }
 
+    let parsedStats = null;
+    try { if (statsJson) parsedStats = JSON.parse(statsJson); } catch (e) {}
+
+    if (typeof broadcastMatchEvent === 'function') {
+      broadcastMatchEvent(matchId, {
+        status: s,
+        home_score: h,
+        away_score: a,
+        screenshot_url: scUrl,
+        stats: parsedStats
+      });
+    }
+
     broadcast({ type: 'standings_updated', leagueId: match.league_id });
-    res.json({ success: true, message: 'Uchrashuv ma‘lumotlari admin tomonidan yangilandi.' });
+    res.json({
+      success: true,
+      message: 'Uchrashuv ma‘lumotlari admin tomonidan muvaffaqiyatli saqlandi.',
+      match: {
+        id: matchId,
+        home_score: h,
+        away_score: a,
+        status: s,
+        screenshot_url: scUrl,
+        stats: parsedStats
+      }
+    });
   } catch (err) {
     console.error('Uchrashuvni tahrirlashda xatolik:', err);
     res.status(500).json({ success: false, error: err.message });

@@ -65,15 +65,32 @@ router.post('/upload-screenshot/:id', upload.single('screenshot'), (req, res) =>
       return res.status(400).json({ success: false, message: 'Skrinshot fayli yuklanmadi.' });
     }
 
-    const match = db.prepare(`SELECT id, league_id, round FROM matches WHERE id = ?`).get(matchId);
+    const match = db.prepare(`
+      SELECT m.id, m.league_id, m.round,
+             h.telegram_id as home_tg, a.telegram_id as away_tg
+      FROM matches m
+      JOIN participants h ON m.home_participant_id = h.id
+      JOIN participants a ON m.away_participant_id = a.id
+      WHERE m.id = ?
+    `).get(matchId);
+
     if (!match) {
       if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
       return res.status(404).json({ success: false, message: 'Uchrashuv topilmadi.' });
     }
 
-    // Check if the match's round is locked
+    const telegramId = String(req.telegramUser?.id || '');
+    const isHome = match.home_tg === telegramId;
+    const isAway = match.away_tg === telegramId;
+
+    if (!isHome && !isAway && !req.isAdmin) {
+      if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+      return res.status(403).json({ success: false, message: 'Faqat shu uchrashuv ishtirokchilari yoki tasdiqlangan admin skrinshot yuklay oladi.' });
+    }
+
+    // Check if the match's round is locked (Admin can bypass)
     const lockCheck = checkRoundLocked(match.league_id, match.round);
-    if (lockCheck.locked) {
+    if (lockCheck.locked && !req.isAdmin) {
       if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
       const pendingText = lockCheck.pendingMatches.map(p => p.title).join(', ');
       return res.status(400).json({
@@ -120,9 +137,9 @@ router.post('/submit/:id', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Uchrashuv topilmadi.' });
     }
 
-    // Check if the match's round is locked (waiting for previous round to finish)
+    // Check if the match's round is locked (waiting for previous round to finish) - Admin can bypass
     const lockCheck = checkRoundLocked(match.league_id, match.round);
-    if (lockCheck.locked) {
+    if (lockCheck.locked && !req.isAdmin) {
       const pendingText = lockCheck.pendingMatches.map(p => p.title).join(', ');
       const msg = `${match.round}-tur o‘yinlarini kiritish qulflangan. Avval ${lockCheck.currentRound}-turning barcha o‘yinlari yakunlanishi shart!`;
       return res.status(400).json({
@@ -138,21 +155,21 @@ router.post('/submit/:id', async (req, res) => {
       });
     }
 
-    // Only participants can submit
+    // Only participants or verified admin can submit
     const isHome = match.home_tg === telegramId;
     const isAway = match.away_tg === telegramId;
 
     if (!isHome && !isAway && !req.isAdmin) {
-      return res.status(403).json({ success: false, message: 'Faqat shu uchrashuvda qatnashgan ikki o‘yinchidan biri natija kirita oladi.' });
+      return res.status(403).json({ success: false, message: 'Faqat shu uchrashuvda qatnashgan ikki o‘yinchidan biri yoki tasdiqlangan admin natija kirita oladi.' });
     }
 
-    // Finished match cannot be edited
-    if (match.status === 'finished') {
+    // Finished match cannot be edited by non-admin
+    if (match.status === 'finished' && !req.isAdmin) {
       return res.status(400).json({ success: false, message: 'Ushbu uchrashuv natijasi allaqachon tasdiqlangan va yakunlangan.' });
     }
 
-    // If opponent already submitted, show exact message
-    if (match.status === 'submitted') {
+    // If opponent already submitted, show exact message to non-admin
+    if (match.status === 'submitted' && !req.isAdmin) {
       return res.status(400).json({
         success: false,
         message: 'Bu uchrashuv natijasi allaqachon kiritilgan',
@@ -360,4 +377,5 @@ router.post('/dispute/:id', (req, res) => {
   }
 });
 
+router.settlePredictions = settlePredictions;
 module.exports = router;

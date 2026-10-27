@@ -344,7 +344,7 @@ const ProfileView = {
         const hasScreenshot = Boolean(m.screenshot_url);
 
         return `
-          <div class="round-match-row">
+          <div class="round-match-row" style="cursor: pointer;" onclick="if(window.MatchesView) MatchesView.openMatchModal(${m.id})">
             <div class="round-match-header">
               <span style="color: var(--muted); font-weight: 500;">${m.round}-tur uchrashuvi</span>
               ${statusBadge}
@@ -367,7 +367,7 @@ const ProfileView = {
                 <button 
                   class="round-screenshot-link" 
                   type="button" 
-                  onclick="ProfileView.openScreenshotModal('${this.escape(m.screenshot_url)}', '${this.escape(m.home_player_name)} vs ${this.escape(m.away_player_name)}')"
+                  onclick="event.stopPropagation(); ProfileView.openScreenshotModal('${this.escape(m.screenshot_url)}', '${this.escape(m.home_player_name)} vs ${this.escape(m.away_player_name)}')"
                 >
                   <svg class="i" viewBox="0 0 24 24" style="width: 14px; height: 14px;">
                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>

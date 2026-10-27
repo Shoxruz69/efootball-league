@@ -21,6 +21,7 @@ const App = {
       if (savedUser) {
         this.currentUser = JSON.parse(savedUser);
       }
+      this.isAdmin = localStorage.getItem('efootball_is_admin') === '1';
     } catch (e) {}
     this.renderHeaderUser();
 
@@ -140,8 +141,10 @@ const App = {
     try {
       const res = await API.getMyProfile();
       this.currentUser = res.participant || null;
+      this.isAdmin = Boolean(res.isAdmin);
       try {
         localStorage.setItem('efootball_current_user', JSON.stringify(this.currentUser));
+        localStorage.setItem('efootball_is_admin', this.isAdmin ? '1' : '0');
       } catch (e) {}
       this.renderHeaderUser();
       return this.currentUser;
