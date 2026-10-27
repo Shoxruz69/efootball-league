@@ -61,13 +61,13 @@ html, body {
   height: 100%;
   width: 100%;
   background-color: #050508;
-  background-image: url('../assets/neon-bg.png');
+  background-image: url('../assets/neon-bg-mobile.png');
   background-size: cover;
-  background-position: center center;
+  background-position: center top;
   background-repeat: no-repeat;
   background-attachment: fixed;
   font-family: var(--font-family);
-  color: var(--text);
+  color: #ffffff;
   font-size: 14px;
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
@@ -107,10 +107,22 @@ body {
   position: relative;
   overflow: hidden;
   background-color: #050508;
-  background-image: url('../assets/neon-bg.png');
+  background-image: url('../assets/neon-bg-mobile.png');
   background-size: cover;
-  background-position: center center;
+  background-position: center top;
   background-repeat: no-repeat;
+}
+
+/* Laptop / Desktop widescreen view */
+@media (min-width: 600px) {
+  html, body {
+    background-image: url('../assets/neon-bg.png');
+    background-size: cover;
+    background-position: center center;
+  }
+  .app-container {
+    background: transparent;
+  }
 }
 
 /* SVG outline icon helper */
@@ -135,7 +147,7 @@ svg.i {
   padding: calc(env(safe-area-inset-top, 0px) + 14px) 18px 6px;
   font-size: 13px;
   font-weight: 500;
-  color: var(--text-secondary);
+  color: rgba(255, 255, 255, 0.85);
   background: transparent;
   z-index: 10;
 }
@@ -147,10 +159,11 @@ svg.i {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  color: #ffffff;
 }
 
 .top-header-icon {
-  color: var(--blue);
+  color: var(--cyan);
   width: 22px;
   height: 22px;
   flex-shrink: 0;
@@ -222,26 +235,28 @@ svg.i {
   display: flex;
   align-items: center;
   gap: 10px;
-  color: var(--blue);
+  color: var(--cyan);
 }
 
 .view-title-row svg.i {
   width: 28px;
   height: 28px;
-  color: var(--blue);
+  color: var(--cyan);
+  stroke: var(--cyan);
 }
 
-.view-title-row h1 {
+.view-title-row h1,
+.view-header h1 {
   font-size: 28px;
   font-weight: 700;
-  color: var(--text);
+  color: #ffffff;
   letter-spacing: -0.3px;
   line-height: 1.15;
 }
 
 .view-subtitle {
-  font-size: 12.5px;
-  color: var(--text-secondary);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.78);
   margin-top: 4px;
   font-weight: 400;
 }
@@ -391,7 +406,7 @@ svg.i {
   font-size: 13.5px;
   font-weight: 500;
   height: 36px;
-  color: var(--text-secondary);
+  color: rgba(255, 255, 255, 0.75);
   background: transparent;
   user-select: none;
 }
@@ -833,21 +848,61 @@ svg.i {
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
   padding: 10px 16px calc(env(safe-area-inset-bottom, 0px) + 12px);
-  background: var(--bg);
+  background: transparent;
   z-index: 10;
-  border-top: 1px solid rgba(26, 42, 74, 0.06);
+  border-top: none;
 }
 
 .bottom-nav-bar .pill {
   padding: 11px 4px;
-  font-size: 14.5px;
+  font-size: 14px;
   min-height: 44px;
   gap: 6px;
+  border-radius: 12px;
+  color: #ffffff;
+  /* Ko'k-moviy gradient barcha 3 ta tugma uchun */
+  background: linear-gradient(135deg, rgba(12, 55, 130, 0.75) 0%, rgba(0, 145, 210, 0.65) 100%);
+  border: 1px solid rgba(0, 210, 255, 0.35);
+  box-shadow: 0 4px 12px rgba(0, 40, 100, 0.35);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: all 180ms ease;
 }
 
-.bottom-nav-bar svg.i {
+.bottom-nav-bar .pill svg.i {
   width: 19px;
   height: 19px;
+  stroke: #ffffff;
+  color: #ffffff;
+}
+
+.bottom-nav-bar .pill span {
+  color: #ffffff;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+}
+
+/* Faol tugma yorqin ko'k-moviy gradient bilan ajralib tursin */
+.bottom-nav-bar .pill.on,
+.bottom-nav-bar .pill.active {
+  background: linear-gradient(90deg, #0066ff 0%, #00d2ff 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 18px rgba(0, 210, 255, 0.6), 0 0 10px rgba(0, 102, 255, 0.4) !important;
+  transform: translateY(-1px);
+}
+
+.bottom-nav-bar .pill.on span,
+.bottom-nav-bar .pill.active span {
+  font-weight: 700;
+  color: #ffffff !important;
+}
+
+.bottom-nav-bar .pill.on svg.i,
+.bottom-nav-bar .pill.active svg.i {
+  stroke: #ffffff !important;
+  color: #ffffff !important;
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.8));
 }
 
 /* --------------------------------------------------------------------------
