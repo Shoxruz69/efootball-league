@@ -60,42 +60,63 @@ const MatchesView = {
 
     try {
       const data = await API.getMatches();
-      const matches = data.matches || [];
-      const rounds = data.rounds || [];
+      const matches = (data && Array.isArray(data.matches)) ? data.matches : [];
+      const rounds = (data && Array.isArray(data.rounds)) ? data.rounds : [];
 
       this.allRounds = rounds;
+      const currentUser = window.App?.currentUser;
 
       if (rounds.length === 0) {
         if (chipsBar) chipsBar.innerHTML = '';
         if (listContainer) {
-          listContainer.innerHTML = `
-            <div class="state-box">
-              <svg class="i" viewBox="0 0 24 24">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                <line x1="16" y1="2" x2="16" y2="6"/>
-                <line x1="8" y1="2" x2="8" y2="6"/>
-                <line x1="3" y1="10" x2="21" y2="10"/>
-              </svg>
-              <h3>Hali taqvim tuzilmagan</h3>
-              <p>Ishtirokchilar ro'yxatdan o'tgach, taqvim avtomatik tuziladi.</p>
-              <button class="pill on" onclick="App.showRegisterModal()" type="button">
-                Ro'yxatdan o'tish
-              </button>
-            </div>
-          `;
+          if (currentUser) {
+            listContainer.innerHTML = `
+              <div class="state-box">
+                <svg class="i" viewBox="0 0 24 24">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                  <line x1="16" y1="2" x2="16" y2="6"/>
+                  <line x1="8" y1="2" x2="8" y2="6"/>
+                  <line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+                <h3>Hali taqvim tuzilmagan</h3>
+                <p>Siz turnirga muvaffaqiyatli qabul qilingansiz. Admin tomonidan taqvim/qur'a tuzilishi kutilmoqda.</p>
+                <button class="pill on" onclick="MatchesView.loadMatches()" type="button">
+                  Qayta tekshirish
+                </button>
+              </div>
+            `;
+          } else {
+            listContainer.innerHTML = `
+              <div class="state-box">
+                <svg class="i" viewBox="0 0 24 24">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                  <line x1="16" y1="2" x2="16" y2="6"/>
+                  <line x1="8" y1="2" x2="8" y2="6"/>
+                  <line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+                <h3>Hali taqvim tuzilmagan</h3>
+                <p>Turnirda qatnashish va o‘yinlaringizni ko‘rish uchun ro‘yxatdan o‘ting.</p>
+                <button class="pill on" onclick="App.showRegisterModal()" type="button">
+                  Ro'yxatdan o'tish
+                </button>
+              </div>
+            `;
+          }
         }
         return;
       }
 
-      if (!this.currentRound || !rounds.includes(this.currentRound)) {
-        this.currentRound = data.currentRound || rounds[0];
+      const numRounds = rounds.map(r => parseInt(r, 10));
+      const curNum = parseInt(this.currentRound, 10);
+      if (!this.currentRound || !numRounds.includes(curNum)) {
+        this.currentRound = parseInt(data.currentRound, 10) || numRounds[0] || 1;
       }
 
       // Render round chips
       if (chipsBar) {
         chipsBar.innerHTML = rounds.map(r => `
           <button 
-            class="pill ${r === this.currentRound ? 'on' : ''}" 
+            class="pill ${parseInt(r, 10) === parseInt(this.currentRound, 10) ? 'on' : ''}" 
             onclick="MatchesView.selectRound(${r})" 
             type="button"
           >
@@ -105,27 +126,31 @@ const MatchesView = {
       }
 
       // Filter matches by current selected round
-      const roundMatches = matches.filter(m => m.round === this.currentRound);
+      const roundMatches = matches.filter(m => parseInt(m.round, 10) === parseInt(this.currentRound, 10));
 
       if (roundMatches.length === 0) {
         if (listContainer) {
           listContainer.innerHTML = `
             <div class="state-box">
               <h3>Bu turda o'yinlar yo'q</h3>
-              <p>Boshqa turni tanlang.</p>
+              <p>Boshqa turni tanlang yoki sahifani yangilang.</p>
+              <button class="pill on" onclick="MatchesView.loadMatches()" type="button">
+                Qayta yuklash
+              </button>
             </div>
           `;
         }
         return;
       }
 
-      const myTgId = String(window.TelegramService?.getUser()?.id || '');
+      const myTgId = String(currentUser?.telegram_id || window.TelegramService?.getUser()?.id || '');
+      const myParticipantId = currentUser?.id;
 
       if (listContainer) {
         listContainer.innerHTML = roundMatches.map((m, idx) => {
-          const isHome = String(m.home_telegram_id) === myTgId;
-          const isAway = String(m.away_telegram_id) === myTgId;
-          const isMyMatch = isHome || isAway;
+          const isHome = String(m.home_telegram_id) === myTgId || (myParticipantId && m.home_participant_id === myParticipantId);
+          const isAway = String(m.away_telegram_id) === myTgId || (myParticipantId && m.away_participant_id === myParticipantId);
+          const isMyMatch = Boolean(isHome || isAway);
           const isConfirmed = m.status === 'finished';
           const isSubmitted = m.status === 'submitted';
           const isDisputed = m.status === 'disputed';
@@ -243,10 +268,12 @@ const MatchesView = {
       const match = res.match;
       if (!match) return;
 
-      const myTgId = String(window.TelegramService?.getUser()?.id || '');
-      const isHome = String(match.home_telegram_id) === myTgId;
-      const isAway = String(match.away_telegram_id) === myTgId;
-      const isParticipant = isHome || isAway;
+      const currentUser = window.App?.currentUser;
+      const myTgId = String(currentUser?.telegram_id || window.TelegramService?.getUser()?.id || '');
+      const myParticipantId = currentUser?.id;
+      const isHome = String(match.home_telegram_id) === myTgId || (myParticipantId && match.home_participant_id === myParticipantId);
+      const isAway = String(match.away_telegram_id) === myTgId || (myParticipantId && match.away_participant_id === myParticipantId);
+      const isParticipant = Boolean(isHome || isAway);
       const myName = isHome ? match.home_player_name : match.away_player_name;
 
       let modalContent = '';

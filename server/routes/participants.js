@@ -265,19 +265,31 @@ router.post('/register', (req, res) => {
         success: true,
         status: 'waitlist',
         message: `Asosiy joylar to‘lgan. Siz kutish ro‘yxatiga #${waitlistOrder}-raqam bilan qo‘shildingiz! Joy bo‘shashi bilan sizga xabar beriladi.`,
-        participantId
+        participantId,
+        participant: {
+          id: participantId,
+          player_name: cleanNickname,
+          status,
+          waitlist_order: waitlistOrder
+        }
       });
     }
 
     res.json({
       success: true,
       status: 'active',
-      message: `Tabriklaymiz! Siz ligaga muvaffaqiyatli qabul qilindingiz: ${cleanPlayerName} — ${cleanClubName}`,
-      participantId
+      message: `Tabriklaymiz! Siz ligaga muvaffaqiyatli qabul qilindingiz: ${cleanNickname}`,
+      participantId,
+      participant: {
+        id: participantId,
+        player_name: cleanNickname,
+        status,
+        waitlist_order: 0
+      }
     });
   } catch (err) {
     console.error('Ro‘yxatdan o‘tishda xatolik:', err);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, message: 'Server xatosi: ' + err.message });
   }
 });
 

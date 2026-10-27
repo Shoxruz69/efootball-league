@@ -48,6 +48,11 @@ const ProfileView = {
     try {
       const data = await API.getMyProfile();
       const p = data.participant;
+      if (window.App) {
+        window.App.currentUser = p || null;
+        try { localStorage.setItem('efootball_current_user', JSON.stringify(p || null)); } catch(e) {}
+        window.App.renderHeaderUser();
+      }
       const stats = data.stats || {
         total_seasons: 1,
         best_season: '—',

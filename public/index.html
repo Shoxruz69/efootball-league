@@ -221,7 +221,8 @@
       var spinner = document.getElementById('initialLoadingSpinner');
       if (spinner) {
         if (window.App && typeof window.App.navigateTo === 'function') {
-          window.App.navigateTo('standings');
+          var saved = sessionStorage.getItem('efootball_active_view') || 'standings';
+          window.App.navigateTo(saved);
         }
         var retry = document.getElementById('fallbackRetryBtn');
         if (retry) retry.style.display = 'block';

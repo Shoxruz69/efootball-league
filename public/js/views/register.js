@@ -140,6 +140,13 @@ const RegisterModal = {
       });
 
       try { window.TelegramService?.haptic('success'); } catch (e) {}
+      
+      if (res.participant && window.App) {
+        window.App.currentUser = res.participant;
+        try { localStorage.setItem('efootball_current_user', JSON.stringify(res.participant)); } catch(e) {}
+        window.App.renderHeaderUser();
+      }
+
       this.close();
 
       if (window.App) {

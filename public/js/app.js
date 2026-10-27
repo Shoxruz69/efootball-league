@@ -5,6 +5,7 @@
  */
 const App = {
   currentView: 'standings',
+  currentUser: null,
   ws: null,
 
   async init() {
@@ -14,6 +15,15 @@ const App = {
       console.warn('[App] Telegram init warning:', e);
     }
 
+    // 0. Restore cached user session immediately (no flickering)
+    try {
+      const savedUser = localStorage.getItem('efootball_current_user');
+      if (savedUser) {
+        this.currentUser = JSON.parse(savedUser);
+      }
+    } catch (e) {}
+    this.renderHeaderUser();
+
     // Setup navigation tabs (Strictly 3 tabs)
     document.querySelectorAll('#bottomNav .pill').forEach(tab => {
       tab.addEventListener('click', () => {
@@ -22,21 +32,24 @@ const App = {
       });
     });
 
-    // Check URL parameters
+    // Check URL parameters and saved session view
     const urlParams = new URLSearchParams(window.location.search);
     const targetView = urlParams.get('view');
     const targetMatchId = urlParams.get('match_id');
     const secretParam = urlParams.get('secret') || urlParams.get('key');
+    const savedView = sessionStorage.getItem('efootball_active_view');
 
     // Save admin secret if provided in URL
     if (secretParam) {
       localStorage.setItem('efootball_admin_secret', secretParam);
     }
 
-    // 1. Render initial view immediately (Default is Standings)
+    // 1. Render initial view immediately (Persists active view across refreshes)
     const initialView = (targetView && ['standings', 'matches', 'profile', 'admin'].includes(targetView))
       ? targetView
-      : 'standings';
+      : (savedView && ['standings', 'matches', 'profile', 'admin'].includes(savedView))
+        ? savedView
+        : 'standings';
     this.navigateTo(initialView);
 
     // 2. Connect WebSocket and check user registration in background
@@ -45,7 +58,7 @@ const App = {
     } catch (e) {}
 
     try {
-      this.checkUserRegistration();
+      await this.checkUserRegistration();
     } catch (e) {}
 
     // 3. If specific match requested via deep-link
@@ -63,6 +76,9 @@ const App = {
       viewName = 'standings';
     }
     this.currentView = viewName;
+    try {
+      sessionStorage.setItem('efootball_active_view', viewName);
+    } catch (e) {}
 
     // Update bottom nav active state (.on)
     document.querySelectorAll('#bottomNav .pill').forEach(tab => {
@@ -92,7 +108,7 @@ const App = {
         <div class="state-box">
           <h3 style="color: var(--loss);">Ekranni yuklashda xatolik</h3>
           <p>${err.message || "Noma'lum xatolik"}</p>
-          <button class="pill" onclick="App.navigateTo('${viewName}')" type="button">
+          <button class="pill on" onclick="App.navigateTo('${viewName}')" type="button">
             Qayta urinish
           </button>
         </div>
@@ -100,30 +116,38 @@ const App = {
     }
   },
 
+  renderHeaderUser() {
+    const headerUserTag = document.getElementById('headerUserTag');
+    if (!headerUserTag) return;
+
+    if (this.currentUser && this.currentUser.player_name) {
+      headerUserTag.innerHTML = `
+        <span class="user-status-pill">
+          <span class="dot"></span>
+          <span>${this.escape(this.currentUser.player_name)}</span>
+        </span>
+      `;
+    } else {
+      headerUserTag.innerHTML = `
+        <button class="pill" style="padding: 4px 10px; font-size: 11.5px; min-height: 28px;" onclick="App.showRegisterModal()" type="button">
+          Ro'yxatdan o'tish
+        </button>
+      `;
+    }
+  },
+
   async checkUserRegistration() {
     try {
       const res = await API.getMyProfile();
-      const p = res.participant;
-      const headerUserTag = document.getElementById('headerUserTag');
-
-      if (!headerUserTag) return;
-
-      if (p) {
-        headerUserTag.innerHTML = `
-          <span class="user-status-pill">
-            <span class="dot"></span>
-            <span>${this.escape(p.player_name)}</span>
-          </span>
-        `;
-      } else {
-        headerUserTag.innerHTML = `
-          <button class="pill" style="padding: 4px 10px; font-size: 11.5px; min-height: 28px;" onclick="App.showRegisterModal()" type="button">
-            Ro'yxatdan o'tish
-          </button>
-        `;
-      }
+      this.currentUser = res.participant || null;
+      try {
+        localStorage.setItem('efootball_current_user', JSON.stringify(this.currentUser));
+      } catch (e) {}
+      this.renderHeaderUser();
+      return this.currentUser;
     } catch (e) {
       console.warn('Registration check failed:', e);
+      return this.currentUser;
     }
   },
 

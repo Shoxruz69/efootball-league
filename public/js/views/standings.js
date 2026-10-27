@@ -159,23 +159,34 @@ const StandingsView = {
     if (!bodyContainer) return;
 
     if (!standings || standings.length === 0) {
+      const currentUser = window.App?.currentUser;
       bodyContainer.innerHTML = `
         <div style="padding: 36px 16px; text-align: center;">
           <div style="font-weight: 700; font-size: 16px; color: var(--white); margin-bottom: 6px;">Hali ishtirokchilar yo'q</div>
-          <div style="color: var(--muted); font-size: 13px; margin-bottom: 16px;">Ro'yxatdan o'tib birinchi bo'lib qo'shiling.</div>
-          <button class="pill on" onclick="App.showRegisterModal()" type="button">
-            Ro'yxatdan o'tish
-          </button>
+          <div style="color: var(--muted); font-size: 13px; margin-bottom: 16px;">
+            ${currentUser ? 'Siz ro‘yxatdan o‘tgansiz. Tez orada boshqa ishtirokchilar qo‘shiladi.' : 'Ro‘yxatdan o‘tib birinchi bo‘lib qo‘shiling.'}
+          </div>
+          ${!currentUser ? `
+            <button class="pill on" onclick="App.showRegisterModal()" type="button">
+              Ro'yxatdan o'tish
+            </button>
+          ` : `
+            <button class="pill on" onclick="StandingsView.loadData()" type="button">
+              Yangilash
+            </button>
+          `}
         </div>
       `;
       return;
     }
 
-    const myTgId = String(window.TelegramService?.getUser()?.id || '');
+    const currentUser = window.App?.currentUser;
+    const myTgId = String(currentUser?.telegram_id || window.TelegramService?.getUser()?.id || '');
+    const myParticipantId = currentUser?.id;
     const colClass = this.showSetB ? 'cols-b' : 'cols-a';
 
     bodyContainer.innerHTML = standings.map((p, index) => {
-      const isMe = String(p.telegram_id) === myTgId;
+      const isMe = String(p.telegram_id) === myTgId || (myParticipantId && p.participant_id === myParticipantId);
       const isFirst = index === 0;
       const rowId = `row_${p.participant_id || p.telegram_id || index}`;
 

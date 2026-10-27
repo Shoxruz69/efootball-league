@@ -29,8 +29,8 @@ router.get('/', (req, res) => {
         a.avatar_url as away_avatar_url,
         a.telegram_id as away_telegram_id
       FROM matches m
-      JOIN participants h ON m.home_participant_id = h.id
-      JOIN participants a ON m.away_participant_id = a.id
+      LEFT JOIN participants h ON m.home_participant_id = h.id
+      LEFT JOIN participants a ON m.away_participant_id = a.id
       WHERE m.league_id = ?
     `;
 
@@ -56,18 +56,24 @@ router.get('/', (req, res) => {
     res.json({
       success: true,
       leagueId: league.id,
-      currentRound: league.current_round,
-      totalRounds: league.total_rounds,
+      currentRound: league.current_round || 1,
+      totalRounds: league.total_rounds || 1,
       rounds,
-      matches: matches.map(m => ({
-        ...m,
-        stats: m.stats_json ? JSON.parse(m.stats_json) : null,
-        live_state: m.live_state_json ? JSON.parse(m.live_state_json) : null
-      }))
+      matches: matches.map(m => {
+        let stats = null;
+        let liveState = null;
+        try { if (m.stats_json) stats = JSON.parse(m.stats_json); } catch (e) {}
+        try { if (m.live_state_json) liveState = JSON.parse(m.live_state_json); } catch (e) {}
+        return {
+          ...m,
+          stats,
+          live_state: liveState
+        };
+      })
     });
   } catch (err) {
     console.error('Uchrashuvlarni olishda xatolik:', err);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: err.message, message: 'Uchrashuvlarni yuklashda xatolik' });
   }
 });
 
