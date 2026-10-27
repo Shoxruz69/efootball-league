@@ -110,6 +110,10 @@ async function runTests() {
   assert(Array.isArray(resMatches.data.matches), 'Matches massiv shaklida qaytadi');
   assert(Array.isArray(resMatches.data.rounds), 'Rounds massiv shaklida qaytadi');
 
+  // Clean up created test participants
+  const db = require('../server/db');
+  db.prepare("DELETE FROM participants WHERE telegram_id LIKE 'test_tg_%' OR telegram_id LIKE '999888%' OR player_name LIKE 'Player_%' OR player_name LIKE 'NewNick_%'").run();
+
   console.log('\n==========================================');
   console.log(`Natija: ${passed} ta o‘tdi, ${failed} ta xato`);
   console.log('==========================================');

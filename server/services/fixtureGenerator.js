@@ -77,6 +77,7 @@ function calculateStandings(participants, matches) {
 
   participants.forEach(p => {
     stats[p.id] = {
+      id: p.id,
       participant_id: p.id,
       player_name: p.player_name,
       club_name: p.club_name,
