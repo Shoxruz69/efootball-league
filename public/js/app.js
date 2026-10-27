@@ -64,14 +64,6 @@ const App = {
     }
     this.currentView = viewName;
 
-    // Toggle pitch background for Standings view
-    const isStandings = viewName === 'standings';
-    const appContainer = document.getElementById('appContainer') || document.querySelector('.app-container');
-    if (appContainer) {
-      appContainer.classList.toggle('view-standings-active', isStandings);
-    }
-    document.body.classList.toggle('view-standings-active', isStandings);
-
     // Update bottom nav active state (.on)
     document.querySelectorAll('#bottomNav .pill').forEach(tab => {
       tab.classList.toggle('on', tab.getAttribute('data-view') === viewName);

@@ -60,7 +60,12 @@
 html, body {
   height: 100%;
   width: 100%;
-  background: var(--outer-bg);
+  background-color: #050508;
+  background-image: url('../assets/neon-bg.png');
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
   font-family: var(--font-family);
   color: var(--text);
   font-size: 14px;
@@ -101,21 +106,11 @@ body {
   flex-direction: column;
   position: relative;
   overflow: hidden;
-  background: var(--bg);
-  transition: background-color 200ms ease;
-}
-
-/* Standings View: Green Football Pitch Background */
-.app-container.view-standings-active {
-  background-color: #286025;
-  background-image: url('../assets/pitch.png');
+  background-color: #050508;
+  background-image: url('../assets/neon-bg.png');
   background-size: cover;
   background-position: center center;
   background-repeat: no-repeat;
-}
-
-.app-container.view-standings-active .top-header {
-  background: transparent;
 }
 
 /* SVG outline icon helper */
@@ -141,7 +136,7 @@ svg.i {
   font-size: 13px;
   font-weight: 500;
   color: var(--text-secondary);
-  background: var(--bg);
+  background: transparent;
   z-index: 10;
 }
 
