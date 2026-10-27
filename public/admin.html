@@ -966,6 +966,11 @@
                 <span>Mavsumni yakunlash</span>
               </button>
 
+              <button class="btn btn-primary" onclick="AdminApp.startNewSeason()" style="background: linear-gradient(135deg, #10b981, #00d2ff); border: none; color: #fff;">
+                <svg class="icon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                <span>Yangi mavsum boshlash</span>
+              </button>
+
               <button class="btn btn-danger" onclick="AdminApp.triggerDraw(true)">
                 <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
                 <span>Qaytadan qur‘a tashlash (Force)</span>
@@ -1234,10 +1239,22 @@
 
       // Admin Action: Complete Season
       async completeSeason() {
-        if (!confirm('Mavsumni rasman yakunlashni tasdiqlaysizmi?')) return;
+        if (!confirm('Mavsumni rasman yakunlashni tasdiqlaysizmi? Barcha natijalar va jadval arxivga saqlanadi.')) return;
         try {
           const res = await this.api('/api/admin/complete-season', { method: 'POST' });
-          alert(res.message || 'Mavsum yakunlandi!');
+          alert(res.message || 'Mavsum yakunlandi va arxivga saqlandi!');
+          await this.loadAllData();
+        } catch (err) {
+          alert('Xatolik: ' + err.message);
+        }
+      },
+
+      // Admin Action: Start New Season
+      async startNewSeason() {
+        if (!confirm('Yangi mavsum boshlashni tasdiqlaysizmi? Ishtirokchilar yangi mavsumga o‘tkaziladi, statistikalar 0 dan boshlanadi va yangi taqvim tuziladi.')) return;
+        try {
+          const res = await this.api('/api/admin/start-new-season', { method: 'POST' });
+          alert(res.message || 'Yangi mavsum muvaffaqiyatli boshlandi!');
           await this.loadAllData();
         } catch (err) {
           alert('Xatolik: ' + err.message);

@@ -8,9 +8,12 @@ const { notifyMatchReminder } = require('../services/botNotifier');
 // Get all matches for current league
 router.get('/', (req, res) => {
   try {
-    const league = db.prepare("SELECT * FROM leagues WHERE status != 'completed' ORDER BY id DESC LIMIT 1").get();
+    let league = db.prepare("SELECT * FROM leagues WHERE status != 'completed' ORDER BY id DESC LIMIT 1").get();
     if (!league) {
-      return res.json({ success: true, matches: [], rounds: [], currentRound: 1 });
+      league = db.prepare("SELECT * FROM leagues ORDER BY id DESC LIMIT 1").get();
+    }
+    if (!league) {
+      return res.json({ success: true, matches: [], rounds: [], currentRound: 1, totalRounds: 1 });
     }
 
     const { round, status } = req.query;
@@ -53,12 +56,22 @@ router.get('/', (req, res) => {
     // Get list of distinct rounds
     const rounds = db.prepare(`SELECT DISTINCT round FROM matches WHERE league_id = ? ORDER BY round ASC`).all(league.id).map(r => r.round);
 
+    // Round lock metadata: a round is locked if round > current_round and league is active
+    const curRound = league.current_round || 1;
+    const roundsInfo = rounds.map(r => ({
+      round: r,
+      isCurrent: r === curRound,
+      isCompleted: r < curRound,
+      isLocked: r > curRound && league.status !== 'completed'
+    }));
+
     res.json({
       success: true,
       leagueId: league.id,
-      currentRound: league.current_round || 1,
+      currentRound: curRound,
       totalRounds: league.total_rounds || 1,
       rounds,
+      roundsInfo,
       matches: matches.map(m => {
         let stats = null;
         let liveState = null;
@@ -66,6 +79,7 @@ router.get('/', (req, res) => {
         try { if (m.live_state_json) liveState = JSON.parse(m.live_state_json); } catch (e) {}
         return {
           ...m,
+          isLocked: m.round > curRound && league.status !== 'completed',
           stats,
           live_state: liveState
         };
@@ -74,6 +88,59 @@ router.get('/', (req, res) => {
   } catch (err) {
     console.error('Uchrashuvlarni olishda xatolik:', err);
     res.status(500).json({ success: false, error: err.message, message: 'Uchrashuvlarni yuklashda xatolik' });
+  }
+});
+
+// Get all matches & results of a specific round (Public for Profil "Tur natijalari")
+router.get('/round/:round', (req, res) => {
+  try {
+    const roundNum = parseInt(req.params.round, 10);
+    let league = db.prepare("SELECT * FROM leagues WHERE status != 'completed' ORDER BY id DESC LIMIT 1").get();
+    if (!league) {
+      league = db.prepare("SELECT * FROM leagues ORDER BY id DESC LIMIT 1").get();
+    }
+    if (!league) {
+      return res.json({ success: true, matches: [], round: roundNum });
+    }
+
+    const matches = db.prepare(`
+      SELECT 
+        m.*,
+        h.player_name as home_player_name,
+        h.club_name as home_club_name,
+        h.club_badge_color as home_badge_color,
+        h.avatar_url as home_avatar_url,
+        h.telegram_id as home_telegram_id,
+        a.player_name as away_player_name,
+        a.club_name as away_club_name,
+        a.club_badge_color as away_badge_color,
+        a.avatar_url as away_avatar_url,
+        a.telegram_id as away_telegram_id
+      FROM matches m
+      LEFT JOIN participants h ON m.home_participant_id = h.id
+      LEFT JOIN participants a ON m.away_participant_id = a.id
+      WHERE m.league_id = ? AND m.round = ?
+      ORDER BY m.id ASC
+    `).all(league.id, roundNum);
+
+    res.json({
+      success: true,
+      leagueId: league.id,
+      currentRound: league.current_round || 1,
+      totalRounds: league.total_rounds || 1,
+      round: roundNum,
+      matches: matches.map(m => {
+        let stats = null;
+        try { if (m.stats_json) stats = JSON.parse(m.stats_json); } catch (e) {}
+        return {
+          ...m,
+          stats
+        };
+      })
+    });
+  } catch (err) {
+    console.error('Tur o‘yinlarini olishda xatolik:', err);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -232,7 +299,10 @@ router.post('/:id/remind', async (req, res) => {
 // Get Standings Table (Turnir jadvali)
 router.get('/table/standings', (req, res) => {
   try {
-    const league = db.prepare("SELECT * FROM leagues WHERE status != 'completed' ORDER BY id DESC LIMIT 1").get();
+    let league = db.prepare("SELECT * FROM leagues WHERE status != 'completed' ORDER BY id DESC LIMIT 1").get();
+    if (!league) {
+      league = db.prepare("SELECT * FROM leagues ORDER BY id DESC LIMIT 1").get();
+    }
     if (!league) {
       return res.json({ success: true, standings: [] });
     }

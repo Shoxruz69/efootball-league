@@ -5,9 +5,15 @@ const db = require('../db');
 // Get current active league details with slots info
 router.get('/current', (req, res) => {
   try {
-    const league = db.prepare("SELECT * FROM leagues WHERE status != 'completed' ORDER BY id DESC LIMIT 1").get();
+    let league = db.prepare("SELECT * FROM leagues WHERE status != 'completed' ORDER BY id DESC LIMIT 1").get();
+    let isCompleted = false;
     if (!league) {
-      return res.status(404).json({ success: false, message: 'Faol liga topilmadi.' });
+      league = db.prepare("SELECT * FROM leagues ORDER BY id DESC LIMIT 1").get();
+      isCompleted = true;
+    }
+
+    if (!league) {
+      return res.status(404).json({ success: false, message: 'Liga topilmadi.' });
     }
 
     const activeCount = db.prepare("SELECT COUNT(*) as count FROM participants WHERE league_id = ? AND status = 'active'").get(league.id).count;
@@ -19,6 +25,7 @@ router.get('/current', (req, res) => {
       success: true,
       league: {
         ...league,
+        isCompleted,
         slots: {
           occupied: activeCount,
           limit: league.participant_limit,
@@ -34,6 +41,64 @@ router.get('/current', (req, res) => {
     });
   } catch (err) {
     console.error('Liga ma\'lumotlarini olishda xatolik:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Get all archived seasons history (Public for all players & admin)
+router.get('/seasons-history', (req, res) => {
+  try {
+    const archives = db.prepare(`
+      SELECT id, league_id, league_name, season, total_rounds, winner_name, winner_club, completed_at
+      FROM season_archives 
+      ORDER BY id DESC
+    `).all();
+
+    res.json({
+      success: true,
+      archives
+    });
+  } catch (err) {
+    console.error('Mavsumlar tarixini olishda xatolik:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Get details of a single archived season
+router.get('/seasons-history/:id', (req, res) => {
+  try {
+    const archiveId = parseInt(req.params.id, 10);
+    const archive = db.prepare('SELECT * FROM season_archives WHERE id = ?').get(archiveId);
+    if (!archive) {
+      return res.status(404).json({ success: false, message: 'Mavsum arxivi topilmadi.' });
+    }
+
+    let standings = [];
+    let matches = [];
+    let awards = null;
+
+    try { standings = JSON.parse(archive.standings_json || '[]'); } catch (e) {}
+    try { matches = JSON.parse(archive.matches_json || '[]'); } catch (e) {}
+    try { if (archive.awards_json) awards = JSON.parse(archive.awards_json); } catch (e) {}
+
+    res.json({
+      success: true,
+      archive: {
+        id: archive.id,
+        league_id: archive.league_id,
+        league_name: archive.league_name,
+        season: archive.season,
+        total_rounds: archive.total_rounds,
+        winner_name: archive.winner_name,
+        winner_club: archive.winner_club,
+        completed_at: archive.completed_at,
+        standings,
+        matches,
+        awards
+      }
+    });
+  } catch (err) {
+    console.error('Mavsum arxivini olishda xatolik:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

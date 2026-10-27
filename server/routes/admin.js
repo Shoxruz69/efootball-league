@@ -5,7 +5,8 @@ const db = require('../db');
 const config = require('../config');
 const { broadcast } = require('../services/websocket');
 const { createAdminSession, destroyAdminSession } = require('../middleware/auth');
-const { generateRoundRobinFixtures } = require('../services/fixtureGenerator');
+const { generateRoundRobinFixtures, calculateStandings } = require('../services/fixtureGenerator');
+const { checkAndAdvanceRound } = require('../services/roundManager');
 
 // 1. Web Admin Login Endpoint (Password Authentication)
 router.post('/login', (req, res) => {
@@ -129,6 +130,7 @@ router.post('/resolve-dispute/:id', (req, res) => {
       `).run(h, a, matchId);
 
       broadcast({ type: 'standings_updated', leagueId: match.league_id });
+      checkAndAdvanceRound(match.league_id);
       res.json({ success: true, message: `Nizo hal qilindi: ${h} - ${a} hisobi rasman tasdiqlandi.` });
 
     } else if (action === 'reset') {
@@ -244,25 +246,187 @@ router.post('/advance-round', (req, res) => {
   }
 });
 
-// 8. Complete season
+// 8. Complete season & archive
 router.post('/complete-season', (req, res) => {
   try {
-    const league = db.prepare("SELECT * FROM leagues WHERE status != 'completed' ORDER BY id DESC LIMIT 1").get();
+    let league = db.prepare("SELECT * FROM leagues WHERE status != 'completed' ORDER BY id DESC LIMIT 1").get();
+    
+    // Idempotent check: if already completed, don't error or create duplicate archive
     if (!league) {
-      return res.status(404).json({ success: false, message: 'Liga topilmadi.' });
+      const latest = db.prepare("SELECT * FROM leagues ORDER BY id DESC LIMIT 1").get();
+      return res.json({
+        success: true,
+        alreadyCompleted: true,
+        message: latest ? `${latest.season} allaqachon yakunlangan va arxivga saqlangan.` : 'Hech qanday liga topilmadi.'
+      });
     }
 
+    // Check if an archive already exists for this league to prevent duplicates
+    const existingArchive = db.prepare("SELECT id FROM season_archives WHERE league_id = ?").get(league.id);
+    if (!existingArchive) {
+      // 1. Gather all active participants
+      const participants = db.prepare("SELECT * FROM participants WHERE league_id = ? AND status = 'active'").all(league.id);
+
+      // 2. Gather all matches with player names and screenshots
+      const matches = db.prepare(`
+        SELECT 
+          m.*,
+          h.player_name as home_name, h.club_name as home_club, h.telegram_id as home_tg,
+          a.player_name as away_name, a.club_name as away_club, a.telegram_id as away_tg
+        FROM matches m
+        LEFT JOIN participants h ON m.home_participant_id = h.id
+        LEFT JOIN participants a ON m.away_participant_id = a.id
+        WHERE m.league_id = ?
+        ORDER BY m.round ASC, m.id ASC
+      `).all(league.id);
+
+      // 3. Calculate final standings and tie-breakers
+      const standings = calculateStandings(participants, matches);
+
+      // 4. Determine awards & winner
+      const winner = standings[0] || null;
+      const topScorer = [...standings].sort((a, b) => (b.goals_for || 0) - (a.goals_for || 0))[0] || null;
+      const playedPlayers = standings.filter(s => (s.played || 0) > 0);
+      const bestDefense = [...playedPlayers].sort((a, b) => (a.goals_against || 0) - (b.goals_against || 0))[0] || null;
+
+      const awards = {
+        winner: winner ? { player: winner.player_name, club: winner.club_name, points: winner.points } : null,
+        topScorer: topScorer && topScorer.goals_for > 0 ? { player: topScorer.player_name, club: topScorer.club_name, goals: topScorer.goals_for } : null,
+        bestDefense: bestDefense ? { player: bestDefense.player_name, club: bestDefense.club_name, conceded: bestDefense.goals_against } : null
+      };
+
+      // 5. Store permanently into season_archives
+      db.prepare(`
+        INSERT INTO season_archives (
+          league_id, league_name, season, total_rounds,
+          winner_name, winner_club, standings_json, matches_json, awards_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        league.id,
+        league.name,
+        league.season,
+        league.total_rounds,
+        winner ? winner.player_name : null,
+        winner ? winner.club_name : null,
+        JSON.stringify(standings),
+        JSON.stringify(matches),
+        JSON.stringify(awards)
+      );
+
+      console.log(`📦 [SEASON ARCHIVED] ${league.season} (Liga #${league.id}) natijalari muvaffaqiyatli arxivlandi.`);
+    }
+
+    // Mark league as completed
     db.prepare("UPDATE leagues SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(league.id);
     broadcast({ type: 'season_completed', leagueId: league.id });
+    broadcast({ type: 'standings_updated', leagueId: league.id });
 
-    res.json({ success: true, message: 'Mavsum rasman yakunlandi!' });
+    res.json({
+      success: true,
+      message: `${league.season} rasman yakunlandi va barcha natijalar arxivga saqlandi!`,
+      leagueId: league.id
+    });
   } catch (err) {
     console.error('Mavsumni yakunlashda xatolik:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// 9. Manually edit any match score
+// 9. Start New Season (transfers all players with fresh 0 stats, auto-generates fixtures)
+router.post('/start-new-season', (req, res) => {
+  try {
+    const activeLeague = db.prepare("SELECT * FROM leagues WHERE status != 'completed' ORDER BY id DESC LIMIT 1").get();
+    if (activeLeague) {
+      return res.status(400).json({
+        success: false,
+        message: 'Avvalgi mavsum hali yakunlanmagan. Yangi mavsum boshlash uchun avval mavsumni yakunlang.'
+      });
+    }
+
+    const prevLeague = db.prepare("SELECT * FROM leagues ORDER BY id DESC LIMIT 1").get();
+    
+    // Auto-increment season name: e.g. "1-Mavsum (2026)" -> "2-Mavsum (2026)"
+    let nextNum = 2;
+    if (prevLeague && prevLeague.season) {
+      const match = prevLeague.season.match(/(\d+)-Mavsum/i);
+      if (match) nextNum = parseInt(match[1], 10) + 1;
+    }
+    const nextSeason = req.body.season || `${nextNum}-Mavsum (2026)`;
+    const leagueName = req.body.name || prevLeague?.name || 'eFootball Uzbekistan Masters';
+    const limit = parseInt(req.body.participant_limit, 10) || prevLeague?.participant_limit || 12;
+    const rules = req.body.rules || prevLeague?.rules || '';
+
+    // Create new league
+    const stmt = db.prepare(`
+      INSERT INTO leagues (name, season, participant_limit, unique_clubs, rules, status, current_round, total_rounds)
+      VALUES (?, ?, ?, ?, ?, 'active', 1, 1)
+    `);
+    const info = stmt.run(leagueName, nextSeason, limit, prevLeague?.unique_clubs || 0, rules);
+    const newLeagueId = info.lastInsertRowid;
+
+    // Carry over all active participants from previous league (they NEVER have to re-register!)
+    let transferredCount = 0;
+    if (prevLeague) {
+      const prevParticipants = db.prepare(`
+        SELECT telegram_id, username, first_name, player_name, club_name, club_badge_color, avatar_url
+        FROM participants 
+        WHERE league_id = ? AND status = 'active'
+        ORDER BY id ASC
+      `).all(prevLeague.id);
+
+      const insertP = db.prepare(`
+        INSERT INTO participants (
+          league_id, telegram_id, username, first_name, player_name, 
+          club_name, club_badge_color, avatar_url, status, waitlist_order
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', 0)
+      `);
+
+      for (const p of prevParticipants) {
+        insertP.run(newLeagueId, p.telegram_id, p.username, p.first_name, p.player_name, p.club_name, p.club_badge_color, p.avatar_url);
+        transferredCount++;
+      }
+    }
+
+    // Auto-generate fresh round-robin schedule for new season
+    const newParticipants = db.prepare("SELECT * FROM participants WHERE league_id = ? AND status = 'active'").all(newLeagueId);
+    let totalMatches = 0;
+    let maxRound = 1;
+
+    if (newParticipants.length >= 2) {
+      const fixtures = generateRoundRobinFixtures(newParticipants);
+      maxRound = Math.max(...fixtures.map(f => f.round), 1);
+      totalMatches = fixtures.length;
+
+      const insertMatch = db.prepare(`
+        INSERT INTO matches (league_id, round, home_participant_id, away_participant_id, status)
+        VALUES (?, ?, ?, ?, 'scheduled')
+      `);
+
+      for (const f of fixtures) {
+        insertMatch.run(newLeagueId, f.round, f.homeId, f.awayId);
+      }
+
+      db.prepare("UPDATE leagues SET total_rounds = ?, current_round = 1 WHERE id = ?").run(maxRound, newLeagueId);
+    }
+
+    broadcast({ type: 'new_season_started', leagueId: newLeagueId, season: nextSeason });
+    broadcast({ type: 'standings_updated', leagueId: newLeagueId });
+
+    res.json({
+      success: true,
+      message: `Yangi ${nextSeason} muvaffaqiyatli boshlandi! ${transferredCount} ta o‘yinchi qayta ro‘yxatdan o‘tmasdan yangi mavsumga o‘tkazildi.`,
+      leagueId: newLeagueId,
+      transferredPlayers: transferredCount,
+      totalMatches,
+      totalRounds: maxRound
+    });
+  } catch (err) {
+    console.error('Yangi mavsum boshlashda xatolik:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 10. Manually edit any match score
 router.put('/matches/:id', (req, res) => {
   try {
     const matchId = parseInt(req.params.id, 10);
@@ -285,6 +449,11 @@ router.put('/matches/:id', (req, res) => {
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(h, a, s, matchId);
+
+    // Auto-advance round if all matches in round are now finished
+    if (s === 'finished') {
+      checkAndAdvanceRound(match.league_id);
+    }
 
     broadcast({ type: 'standings_updated', leagueId: match.league_id });
     res.json({ success: true, message: 'Uchrashuv ma‘lumotlari admin tomonidan yangilandi.' });

@@ -200,6 +200,16 @@ const API = {
     return this.request(`/api/stats/h2h?p1=${p1}&p2=${p2}`);
   },
 
+  getRoundMatches(round) {
+    return this.request(`/api/matches/round/${round}`);
+  },
+  getSeasonsHistory() {
+    return this.request('/api/league/seasons-history');
+  },
+  getSeasonArchive(id) {
+    return this.request(`/api/league/seasons-history/${id}`);
+  },
+
   // Admin Authentication & Actions
   adminLogin(password) {
     return this.request('/api/admin/login', {
@@ -224,6 +234,12 @@ const API = {
   },
   adminCompleteSeason() {
     return this.request('/api/admin/complete-season', { method: 'POST' });
+  },
+  adminStartNewSeason(data = {}) {
+    return this.request('/api/admin/start-new-season', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
   },
   adminGetDisputes() {
     return this.request('/api/admin/disputes');

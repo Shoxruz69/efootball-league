@@ -115,7 +115,10 @@ const AdminView = {
                 Mavsumni yakunlash
               </button>
             </div>
-            <button class="pill" onclick="AdminView.triggerDraw(true)" type="button" style="font-size: 12px; color: var(--loss); border-color: rgba(255, 77, 109, 0.3); margin-top: 4px;">
+            <button class="pill on" onclick="AdminView.startNewSeason()" type="button" style="font-size: 13px; background: linear-gradient(90deg, #10b981, #19c9ff); color: #fff;">
+              Yangi mavsum boshlash
+            </button>
+            <button class="pill" onclick="AdminView.triggerDraw(true)" type="button" style="font-size: 12px; color: var(--loss); border-color: rgba(255, 77, 109, 0.3); margin-top: 2px;">
               Taqvimni qaytadan boshlash (Force)
             </button>
           </div>
@@ -318,8 +321,31 @@ const AdminView = {
     try {
       const res = await API.adminCompleteSeason();
       try { window.TelegramService?.haptic('success'); } catch (e) {}
-      alert(res.message || "Mavsum yakunlandi!");
+      alert(res.message || "Mavsum yakunlandi va arxivga saqlandi!");
       this.loadAdminData();
+      if (window.App) {
+        App.refreshStandings();
+        App.refreshMatches();
+      }
+    } catch (err) {
+      alert(err.message || "Xatolik yuz berdi");
+    }
+  },
+
+  async startNewSeason() {
+    if (!confirm("Yangi mavsum boshlashni tasdiqlaysizmi? Barcha ishtirokchilar yangi mavsumga o‘tkaziladi, statistikalar 0 dan boshlanadi va yangi taqvim tuziladi.")) {
+      return;
+    }
+
+    try {
+      const res = await API.adminStartNewSeason();
+      try { window.TelegramService?.haptic('success'); } catch (e) {}
+      alert(res.message || "Yangi mavsum muvaffaqiyatli boshlandi!");
+      this.loadAdminData();
+      if (window.App) {
+        App.refreshStandings();
+        App.refreshMatches();
+      }
     } catch (err) {
       alert(err.message || "Xatolik yuz berdi");
     }

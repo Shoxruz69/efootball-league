@@ -101,6 +101,20 @@ function initSchema() {
       key TEXT PRIMARY KEY,
       value TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS season_archives (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      league_id INTEGER NOT NULL UNIQUE,
+      league_name TEXT NOT NULL,
+      season TEXT NOT NULL,
+      total_rounds INTEGER NOT NULL DEFAULT 1,
+      winner_name TEXT,
+      winner_club TEXT,
+      standings_json TEXT NOT NULL,
+      matches_json TEXT NOT NULL,
+      awards_json TEXT,
+      completed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   // Create default active league if none exists

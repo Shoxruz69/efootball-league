@@ -8,6 +8,7 @@ const config = require('../config');
 const { analyzeMatchScreenshot } = require('../services/ocrService');
 const { broadcast, broadcastMatchEvent } = require('../services/websocket');
 const { notifyOpponentOfResult, notifyResultConfirmed } = require('../services/botNotifier');
+const { checkRoundLocked, checkAndAdvanceRound } = require('../services/roundManager');
 
 // Setup multer for screenshot uploads
 const uploadDir = path.join(__dirname, '..', config.uploadDir);
@@ -64,9 +65,26 @@ router.post('/upload-screenshot/:id', upload.single('screenshot'), (req, res) =>
       return res.status(400).json({ success: false, message: 'Skrinshot fayli yuklanmadi.' });
     }
 
-    const match = db.prepare(`SELECT id FROM matches WHERE id = ?`).get(matchId);
+    const match = db.prepare(`SELECT id, league_id, round FROM matches WHERE id = ?`).get(matchId);
     if (!match) {
+      if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
       return res.status(404).json({ success: false, message: 'Uchrashuv topilmadi.' });
+    }
+
+    // Check if the match's round is locked
+    const lockCheck = checkRoundLocked(match.league_id, match.round);
+    if (lockCheck.locked) {
+      if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+      const pendingText = lockCheck.pendingMatches.map(p => p.title).join(', ');
+      return res.status(400).json({
+        success: false,
+        locked: true,
+        message: `${match.round}-tur qulflangan. Avval ${lockCheck.currentRound}-turning barcha o‘yinlari yakunlanishi shart!`,
+        currentRound: lockCheck.currentRound,
+        matchRound: match.round,
+        pendingMatches: lockCheck.pendingMatches,
+        pendingText
+      });
     }
 
     const relativeUrl = `/uploads/${req.file.filename}`;
@@ -100,6 +118,24 @@ router.post('/submit/:id', async (req, res) => {
 
     if (!match) {
       return res.status(404).json({ success: false, message: 'Uchrashuv topilmadi.' });
+    }
+
+    // Check if the match's round is locked (waiting for previous round to finish)
+    const lockCheck = checkRoundLocked(match.league_id, match.round);
+    if (lockCheck.locked) {
+      const pendingText = lockCheck.pendingMatches.map(p => p.title).join(', ');
+      const msg = `${match.round}-tur o‘yinlarini kiritish qulflangan. Avval ${lockCheck.currentRound}-turning barcha o‘yinlari yakunlanishi shart!`;
+      return res.status(400).json({
+        success: false,
+        locked: true,
+        error: msg,
+        message: msg,
+        currentRound: lockCheck.currentRound,
+        matchRound: match.round,
+        pending_matches: lockCheck.pendingMatches,
+        pendingMatches: lockCheck.pendingMatches,
+        pendingText
+      });
     }
 
     // Only participants can submit
@@ -247,11 +283,20 @@ router.post('/confirm/:id', async (req, res) => {
     });
     broadcast({ type: 'standings_updated', leagueId: match.league_id });
 
+    // Check if current round is complete and automatically advance!
+    const advanceInfo = checkAndAdvanceRound(match.league_id);
+    let successMsg = 'Uchrashuv natijasi rasman tasdiqlandi va turnir jadvaliga qo‘shildi!';
+    if (advanceInfo?.advanced) {
+      successMsg += ` ${match.round}-turning barcha o‘yinlari yakunlandi, ${advanceInfo.newRound}-tur avtomatik ochildi!`;
+    }
+
     res.json({
       success: true,
-      message: 'Uchrashuv natijasi rasman tasdiqlandi va turnir jadvaliga qo‘shildi!',
+      message: successMsg,
       matchId,
-      status: 'finished'
+      status: 'finished',
+      roundAdvanced: Boolean(advanceInfo?.advanced),
+      newRound: advanceInfo?.newRound || null
     });
   } catch (err) {
     console.error('Natijani tasdiqlashda xatolik:', err);

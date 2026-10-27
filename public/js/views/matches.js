@@ -108,21 +108,31 @@ const MatchesView = {
 
       const numRounds = rounds.map(r => parseInt(r, 10));
       const curNum = parseInt(this.currentRound, 10);
+      const activeRound = parseInt(data.currentRound, 10) || numRounds[0] || 1;
+      this.activeCurrentRound = activeRound;
+      this.allMatches = matches;
+
       if (!this.currentRound || !numRounds.includes(curNum)) {
-        this.currentRound = parseInt(data.currentRound, 10) || numRounds[0] || 1;
+        this.currentRound = activeRound;
       }
 
-      // Render round chips
+      // Render round chips with locked indicator
       if (chipsBar) {
-        chipsBar.innerHTML = rounds.map(r => `
-          <button 
-            class="pill ${parseInt(r, 10) === parseInt(this.currentRound, 10) ? 'on' : ''}" 
-            onclick="MatchesView.selectRound(${r})" 
-            type="button"
-          >
-            ${r}-tur
-          </button>
-        `).join('');
+        chipsBar.innerHTML = rounds.map(r => {
+          const roundNum = parseInt(r, 10);
+          const isSelected = roundNum === parseInt(this.currentRound, 10);
+          const isLocked = roundNum > activeRound;
+          return `
+            <button 
+              class="pill ${isSelected ? 'on' : ''}" 
+              onclick="MatchesView.selectRound(${r})" 
+              type="button"
+              style="${isLocked && !isSelected ? 'opacity: 0.75;' : ''}"
+            >
+              ${r}-tur ${isLocked ? '🔒' : ''}
+            </button>
+          `;
+        }).join('');
       }
 
       // Filter matches by current selected round
@@ -143,11 +153,25 @@ const MatchesView = {
         return;
       }
 
+      const isCurrentRoundLocked = parseInt(this.currentRound, 10) > activeRound;
+      const pendingInActiveRound = matches.filter(m => parseInt(m.round, 10) === activeRound && m.status !== 'finished');
+
       const myTgId = String(currentUser?.telegram_id || window.TelegramService?.getUser()?.id || '');
       const myParticipantId = currentUser?.id;
 
       if (listContainer) {
-        listContainer.innerHTML = roundMatches.map((m, idx) => {
+        const lockedBannerHtml = isCurrentRoundLocked ? `
+          <div style="background: rgba(255, 187, 0, 0.08); border: 1px solid rgba(255, 187, 0, 0.25); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px;">
+            <div style="display: flex; align-items: center; gap: 6px; font-weight: 700; color: #ffbb00; font-size: 13px;">
+              <span>🔒 ${this.currentRound}-tur qulflangan</span>
+            </div>
+            <div style="font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.4;">
+              Hozirgi <b>${activeRound}-tur</b>da hali <b>${pendingInActiveRound.length} ta</b> uchrashuv to'liq yakunlanmagan. Barcha o'yinlar tasdiqlangach, tizim keyingi turni avtomatik ochadi.
+            </div>
+          </div>
+        ` : '';
+
+        const cardsHtml = roundMatches.map((m, idx) => {
           const isHome = String(m.home_telegram_id) === myTgId || (myParticipantId && m.home_participant_id === myParticipantId);
           const isAway = String(m.away_telegram_id) === myTgId || (myParticipantId && m.away_participant_id === myParticipantId);
           const isMyMatch = Boolean(isHome || isAway);
@@ -182,6 +206,8 @@ const MatchesView = {
           let actionHint = "Tafsilot >";
           if (isConfirmed) {
             actionHint = "Ko'rish >";
+          } else if (isCurrentRoundLocked) {
+            actionHint = "Qulflangan 🔒";
           } else if (isMyMatch) {
             if (isSubmitted) {
               const uploaderIsHome = m.home_confirmed === 1;
@@ -233,6 +259,8 @@ const MatchesView = {
             </button>
           `;
         }).join('');
+
+        listContainer.innerHTML = lockedBannerHtml + cardsHtml;
       }
 
     } catch (err) {
@@ -275,37 +303,13 @@ const MatchesView = {
       const isAway = String(match.away_telegram_id) === myTgId || (myParticipantId && match.away_participant_id === myParticipantId);
       const isParticipant = Boolean(isHome || isAway);
       const myName = isHome ? match.home_player_name : match.away_player_name;
+      const activeRound = this.activeCurrentRound || 1;
+      const isRoundLocked = match.status !== 'finished' && parseInt(match.round, 10) > activeRound;
 
       let modalContent = '';
 
-      // CASE 1: USER IS NOT ONE OF THE TWO PARTICIPANTS
-      if (!isParticipant) {
-        modalContent = `
-          <div class="modal-icon-wrap">
-            <svg class="i" viewBox="0 0 24 24">
-              <rect x="5" y="11" width="14" height="10" rx="2"/>
-              <path d="M8 11V8a4 4 0 0 1 8 0v3"/>
-            </svg>
-          </div>
-          <h3>Uchrashuv tafsilotlari</h3>
-          <p>
-            Ushbu natijani faqat unda qatnashuvchi ikki o'yinchi — <b>${this.escape(match.home_player_name)}</b> yoki <b>${this.escape(match.away_player_name)}</b> kirita oladi.
-          </p>
-          ${match.status === 'finished' ? `
-            <div style="background: #f2f4f8; border-radius: 12px; padding: 12px; margin-bottom: 16px;">
-              <div style="font-size: 12px; color: var(--text-secondary); font-weight: 500;">Yakuniy hisob:</div>
-              <div style="font-size: 26px; font-weight: 700; color: var(--text); margin: 4px 0;">
-                ${match.home_score} - ${match.away_score}
-              </div>
-            </div>
-          ` : ''}
-          <button class="pill on" onclick="MatchesView.closeModal()" type="button" style="width: 100%;">
-            Yopish
-          </button>
-        `;
-      }
-      // CASE 2: MATCH IS FINISHED
-      else if (match.status === 'finished') {
+      // CASE 1: MATCH IS FINISHED (Viewable by everyone)
+      if (match.status === 'finished') {
         modalContent = `
           <div class="modal-icon-wrap" style="color: var(--win); background: #e8fbf2;">
             <svg class="i" viewBox="0 0 24 24">
@@ -326,7 +330,7 @@ const MatchesView = {
           ${match.screenshot_url ? `
             <div style="text-align: left; margin: 12px 0;">
               <label class="form-label">Yuklangan skrinshot:</label>
-              <img src="${match.screenshot_url}" class="screenshot-preview-thumb" alt="Skrinshot" />
+              <img src="${match.screenshot_url}" class="screenshot-preview-thumb" alt="Skrinshot" onclick="window.open('${this.escape(match.screenshot_url)}', '_blank')" />
             </div>
           ` : ''}
           <button class="pill on" onclick="MatchesView.closeModal()" type="button" style="width: 100%; margin-top: 10px;">
@@ -334,7 +338,57 @@ const MatchesView = {
           </button>
         `;
       }
-      // CASE 3: MATCH IS SUBMITTED (AWAITING CONFIRMATION)
+      // CASE 2: ROUND IS LOCKED (Current round has unfinished matches)
+      else if (isRoundLocked) {
+        const pendingMatches = (this.allMatches || []).filter(m => parseInt(m.round, 10) === activeRound && m.status !== 'finished');
+        modalContent = `
+          <div class="modal-icon-wrap" style="color: #ffbb00; background: rgba(255, 187, 0, 0.1);">
+            <svg class="i" viewBox="0 0 24 24">
+              <rect x="5" y="11" width="14" height="10" rx="2"/>
+              <path d="M8 11V8a4 4 0 0 1 8 0v3"/>
+            </svg>
+          </div>
+          <h3>Ushbu tur hali ochilmagan</h3>
+          <p style="font-size: 13.5px; color: var(--muted); margin-bottom: 12px;">
+            ${match.round}-turga natija kiritish yopiq. Hozirgi <b>${activeRound}-tur</b>dagi barcha o‘yinlar to'liq o'ynalib, tasdiqlangach tizim bu turni avtomatik ochadi.
+          </p>
+          <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 12px; text-align: left; margin-bottom: 16px;">
+            <div style="font-size: 11px; font-weight: 700; color: #ffbb00; text-transform: uppercase; margin-bottom: 6px;">
+              ${activeRound}-turda kutilayotgan uchrashuvlar (${pendingMatches.length} ta):
+            </div>
+            ${pendingMatches.length > 0 ? pendingMatches.map(pm => `
+              <div style="font-size: 12.5px; color: #ffffff; padding: 4px 0; border-bottom: 1px dashed rgba(255,255,255,0.06); display: flex; justify-content: space-between;">
+                <span>• <b>${this.escape(pm.home_player_name)}</b> vs <b>${this.escape(pm.away_player_name)}</b></span>
+                <span style="font-size: 11px; color: ${pm.status === 'submitted' ? '#ffbb00' : 'var(--muted)'};">
+                  ${pm.status === 'submitted' ? 'Tasdiqlash kutilmoqda' : 'O\'ynalmagan'}
+                </span>
+              </div>
+            `).join('') : '<div style="font-size: 12px; color: var(--muted);">Barcha o\'yinlar yakunlangan.</div>'}
+          </div>
+          <button class="pill on" onclick="MatchesView.closeModal()" type="button" style="width: 100%;">
+            Tushundim
+          </button>
+        `;
+      }
+      // CASE 3: USER IS NOT ONE OF THE TWO PARTICIPANTS
+      else if (!isParticipant) {
+        modalContent = `
+          <div class="modal-icon-wrap">
+            <svg class="i" viewBox="0 0 24 24">
+              <rect x="5" y="11" width="14" height="10" rx="2"/>
+              <path d="M8 11V8a4 4 0 0 1 8 0v3"/>
+            </svg>
+          </div>
+          <h3>Uchrashuv tafsilotlari</h3>
+          <p>
+            Ushbu natijani faqat unda qatnashuvchi ikki o'yinchi — <b>${this.escape(match.home_player_name)}</b> yoki <b>${this.escape(match.away_player_name)}</b> kirita oladi.
+          </p>
+          <button class="pill on" onclick="MatchesView.closeModal()" type="button" style="width: 100%; margin-top: 14px;">
+            Yopish
+          </button>
+        `;
+      }
+      // CASE 4: MATCH IS SUBMITTED (AWAITING CONFIRMATION)
       else if (match.status === 'submitted') {
         const uploaderIsHome = match.home_confirmed === 1;
         const iAmUploader = (isHome && uploaderIsHome) || (isAway && !uploaderIsHome);

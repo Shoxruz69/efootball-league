@@ -50,40 +50,69 @@ router.get('/me', (req, res) => {
       return res.json({ success: true, participant: null, stats: null });
     }
 
-    const league = db.prepare("SELECT * FROM leagues WHERE status != 'completed' ORDER BY id DESC LIMIT 1").get();
+    let league = db.prepare("SELECT * FROM leagues WHERE status != 'completed' ORDER BY id DESC LIMIT 1").get();
+    if (!league) {
+      league = db.prepare("SELECT * FROM leagues ORDER BY id DESC LIMIT 1").get();
+    }
     if (!league) {
       return res.json({ success: true, participant: null, stats: null });
     }
 
-    const participant = db.prepare(`
+    let participant = db.prepare(`
       SELECT * FROM participants 
       WHERE league_id = ? AND telegram_id = ? AND status != 'removed'
       LIMIT 1
     `).get(league.id, telegramId);
 
+    // If player registered in previous seasons, automatically preserve them into current season!
+    if (!participant) {
+      const anyPrevious = db.prepare(`
+        SELECT * FROM participants 
+        WHERE telegram_id = ? AND status != 'removed'
+        ORDER BY id DESC LIMIT 1
+      `).get(telegramId);
+
+      if (anyPrevious) {
+        try {
+          const insertStmt = db.prepare(`
+            INSERT INTO participants (
+              league_id, telegram_id, username, first_name, player_name, 
+              club_name, club_badge_color, avatar_url, status, waitlist_order
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', 0)
+          `);
+          const info = insertStmt.run(
+            league.id, anyPrevious.telegram_id, anyPrevious.username, anyPrevious.first_name,
+            anyPrevious.player_name, anyPrevious.club_name, anyPrevious.club_badge_color, anyPrevious.avatar_url
+          );
+          participant = db.prepare('SELECT * FROM participants WHERE id = ?').get(info.lastInsertRowid);
+        } catch (e) {
+          participant = anyPrevious;
+        }
+      }
+    }
+
     if (!participant) {
       return res.json({ success: true, participant: null, stats: null, isAdmin: req.isAdmin });
     }
 
-    // 1. O‘ynagan sezonlari soni
+    // 1. O‘ynagan sezonlari soni (arxivlar + joriy ligalar)
     const totalSeasonsRow = db.prepare(`
       SELECT COUNT(DISTINCT league_id) as count 
       FROM participants 
       WHERE telegram_id = ? AND status != 'removed'
     `).get(telegramId);
-    const totalSeasons = totalSeasonsRow?.count || 1;
+    const totalSeasons = Math.max(totalSeasonsRow?.count || 1, 1);
 
-    // 2. Jami g‘alaba, durang, mag‘lubiyat, gollar (barcha tasdiqlangan o‘yinlar bo‘yicha)
-    const userMatches = db.prepare(`
+    // 2. Joriy mavsum statistikasi (Yangi mavsumda 0 dan boshlanadi)
+    const currentSeasonMatches = db.prepare(`
       SELECT m.* 
       FROM matches m
       JOIN participants p ON (p.id = m.home_participant_id OR p.id = m.away_participant_id)
-      WHERE p.telegram_id = ? AND m.status = 'finished' AND m.home_score IS NOT NULL AND m.away_score IS NOT NULL
-    `).all(telegramId);
+      WHERE m.league_id = ? AND p.telegram_id = ? AND m.status = 'finished' AND m.home_score IS NOT NULL AND m.away_score IS NOT NULL
+    `).all(league.id, telegramId);
 
-    // Remove duplicates if any
     const uniqueMatchMap = new Map();
-    userMatches.forEach(m => uniqueMatchMap.set(m.id, m));
+    currentSeasonMatches.forEach(m => uniqueMatchMap.set(m.id, m));
 
     let won = 0, drawn = 0, lost = 0, goalsFor = 0, goalsAgainst = 0;
     uniqueMatchMap.forEach(m => {
@@ -101,7 +130,7 @@ router.get('/me', (req, res) => {
 
     // 3. Hozirgi turnirdagi ochko va o‘rni (Standings hisoblash)
     const activeParticipants = db.prepare("SELECT * FROM participants WHERE league_id = ? AND status = 'active'").all(league.id);
-    const activeMatches = db.prepare("SELECT * FROM matches WHERE league_id = ? AND status = 'finished'").all(league.id);
+    const activeMatches = db.prepare("SELECT * FROM matches WHERE league_id = ?").all(league.id);
     const { calculateStandings } = require('../services/fixtureGenerator');
     const standings = calculateStandings(activeParticipants, activeMatches);
     const myStanding = standings.find(s => s.participant_id === participant.id);
@@ -109,29 +138,24 @@ router.get('/me', (req, res) => {
     const currentPoints = myStanding ? myStanding.points : 0;
     const currentRank = myStanding ? myStanding.rank : '-';
 
-    // 4. Eng yaxshi sezoni (faqat yakunlangan mavsumlardan)
-    const completedLeagues = db.prepare(`
-      SELECT l.* FROM leagues l
-      JOIN participants p ON p.league_id = l.id
-      WHERE p.telegram_id = ? AND l.status = 'completed'
-    `).all(telegramId);
-
+    // 4. Eng yaxshi mavsum (arxivlangan mavsumlar va yakunlangan ligalar orasidan)
     let bestSeason = 'Hali yakunlanmagan';
-    if (completedLeagues.length > 0) {
+    const archives = db.prepare("SELECT * FROM season_archives ORDER BY id ASC").all();
+    if (archives.length > 0) {
       let bestRank = 9999;
       let bestPts = -1;
-      completedLeagues.forEach(l => {
-        const lParticipants = db.prepare("SELECT * FROM participants WHERE league_id = ? AND status = 'active'").all(l.id);
-        const lMatches = db.prepare("SELECT * FROM matches WHERE league_id = ? AND status = 'finished'").all(l.id);
-        const lStandings = calculateStandings(lParticipants, lMatches);
-        const lMyStanding = lStandings.find(s => String(s.telegram_id) === telegramId);
-        if (lMyStanding) {
-          if (lMyStanding.rank < bestRank || (lMyStanding.rank === bestRank && lMyStanding.points > bestPts)) {
-            bestRank = lMyStanding.rank;
-            bestPts = lMyStanding.points;
-            bestSeason = `${l.name} (${lMyStanding.rank}-o‘rin, ${lMyStanding.points} ochko)`;
+      archives.forEach(arch => {
+        try {
+          const archStandings = JSON.parse(arch.standings_json || '[]');
+          const myArchStanding = archStandings.find(s => String(s.telegram_id) === telegramId);
+          if (myArchStanding) {
+            if (myArchStanding.rank < bestRank || (myArchStanding.rank === bestRank && myArchStanding.points > bestPts)) {
+              bestRank = myArchStanding.rank;
+              bestPts = myArchStanding.points;
+              bestSeason = `${arch.season} (${myArchStanding.rank}-o‘rin, ${myArchStanding.points} ochko)`;
+            }
           }
-        }
+        } catch (e) {}
       });
     }
 
