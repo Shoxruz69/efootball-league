@@ -109,6 +109,7 @@ node server/index.js
 │   ├── middleware/
 │   │   └── auth.js           # Telegram initData HMAC-SHA256 validatsiyasi
 │   ├── services/
+│   │   ├── keepAlive.js      # Render 24/7 uxlamaslik (Keep-Alive) xizmati
 │   │   ├── ocrService.js     # Tesseract OCR & Gemini Vision tahlilchisi
 │   │   ├── fixtureGenerator.js # Berger round-robin va jadval hisoblash
 │   │   ├── botNotifier.js    # Telegram xabarnoma xizmati

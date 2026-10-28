@@ -126,33 +126,40 @@ Endi har qanday foydalanuvchi botga kirganda pastdagi tugmani bosishi bilan **Lo
 
 ---
 
-## 📊 24/7 Monitoring va Health-Check
+## 🛡️ Render.com da 24/7 Uxlamasdan Ishlash (Free Tier Sleep Fix)
 
-Serveringiz doimo sog‘lom va uxlab qolmasdan ishlayotganini tekshirish uchun tizimda quyidagi monitoring manzillari mavjud:
+Render Free rejimida har qanday web-xizmat agar **15 daqiqa davomida tashqi HTTP so‘rov olmasa**, avtomatik ravishda uyqu ("Sleep / Spin down") rejimiga o‘tadi. Yangi foydalanuvchi kirganda esa 30–50 soniya "Cold start" kutishiga to‘g‘ri keladi.
 
-* **To‘liq holat:** `GET https://sizningdomeningiz.uz/api/health`
-  ```json
-  {
-    "status": "ok",
-    "uptime_human": "5 kun, 12 soat, 4 daqiqa",
-    "database": {
-      "status": "connected",
-      "type": "SQLite (WAL mode)",
-      "active_participants": 12,
-      "total_matches": 66
-    },
-    "telegramBot": {
-      "connected": true,
-      "username": "Efootbal_League_bot"
-    }
-  }
-  ```
-* **Lightweight Ping:** `GET https://sizningdomeningiz.uz/api/health/ping` ➔ `PONG`
+Loyiha ushbu muammoni **ikkita ishonchli mexanizm** bilan 100% hal qiladi:
 
-### Bepul 24/7 Monitoring o‘rnatish:
-1. [UptimeRobot.com](https://uptimerobot.com) ga kiring (bepul).
-2. **“Add New Monitor”** ni bosing:
-   * Monitor Type: `HTTP(s)`
-   * URL: `https://sizningdomeningiz.uz/api/health/ping`
-   * Monitoring Interval: `5 minutes`
-3. Bu xizmat serveringizni har 5 daqiqada tekshirib turadi va server hech qachon to‘xtab qolmasligini ta’minlaydi. Agar serverda uzilish bo‘lsa, sizga darhol Telegram yoki Email orqali xabar yuboradi.
+### 1-Himoya: Avtomatik Ichki Keep-Alive Servisi (`server/services/keepAlive.js`)
+* Server ishga tushganda Render tomonidan avtomatik taqdim etiladigan `RENDER_EXTERNAL_URL` (yoki `MINI_APP_URL`) manzilini aniqlaydi.
+* Har **10 daqiqada** (Render'ning 15 daqiqalik uyqu limitidan oldin) o‘zining `https://<sizning-loyiha>.onrender.com/ping` manziliga yengil HTTP so‘rov yuboradi.
+* Bu Render routeriga doimiy faollik ko‘rsatib, 15 daqiqalik kutish taymerini yangilab turadi va serverni **24/7 uyg‘oq** saqlaydi.
+* Hech qanday qo‘shimcha sozlash shart emas — Render ga deploy qilishingiz bilan o‘zi avtomatik ishga tushadi!
+
+### 2-Himoya: Tashqi Bepul Monitor (100% Doimiy Kafolat)
+Agar server qayta yoqilsa yoki qisqa uzilish bo‘lsa, tashqi ping serverni darhol uyg‘otishi uchun tashqi monitor ulab qo‘yish tavsiya etiladi (1 daqiqa vaqt oladi, mutlaqo bepul):
+
+1. **[UptimeRobot.com](https://uptimerobot.com)** (yoki **[cron-job.org](https://cron-job.org)**) ga kiring va bepul ro‘yxatdan o‘ting.
+2. **"Add New Monitor"** tugmasini bosing:
+   * **Monitor Type:** `HTTP(s)`
+   * **Friendly Name:** `eFootball League 24/7`
+   * **URL (or IP):** `https://<sizning-loyiha>.onrender.com/ping` (yoki `/health`)
+   * **Monitoring Interval:** `5 minutes` (yoki `10 minutes`)
+3. **"Create Monitor"** ni bosing.
+
+> 💡 **Natija:** UptimeRobot dunyoning turli serverlaridan har 5 daqiqada `/ping` ga so‘rov yuborib turadi. Render serveringiz **24/7 umuman uxlamasdan, Telegram boti va Mini App har doim 1 soniyada ochiladigan bo‘lib ishlaydi!**
+
+---
+
+## 📊 Monitoring va Holatni Tekshirish Endpointlari
+
+* **Lightweight Ping (0% server yuki, tezkor 200 OK):**
+  `GET https://sizning-loyiha.onrender.com/ping`
+* **Doimiy Health-Check (Render deploy tekshiruvi uchun):**
+  `GET https://sizning-loyiha.onrender.com/health`
+* **Keep-Alive Holati va Statistikasi:**
+  `GET https://sizning-loyiha.onrender.com/api/keep-alive`
+* **Batafsil Server & Bot Ko‘rsatkichlari (DB, Xotira, Uptime):**
+  `GET https://sizning-loyiha.onrender.com/api/health`

@@ -9,6 +9,7 @@ const { authMiddleware } = require('./middleware/auth');
 const { initWebSocket } = require('./services/websocket');
 const { initBot, getBot } = require('./bot');
 const { startPublicTunnel } = require('./services/tunnelService');
+const { startKeepAlive, getKeepAliveStatus, pingTarget } = require('./services/keepAlive');
 
 // Create logs directory if it doesn't exist
 const logsDir = path.join(__dirname, '..', 'logs');
@@ -159,6 +160,7 @@ app.get('/api/health', (req, res) => {
         url: config.miniAppUrl,
         isHttps: config.miniAppUrl.startsWith('https://')
       },
+      keepAlive: getKeepAliveStatus(),
       tunnel: getTunnelStatus()
     });
   } catch (err) {
@@ -170,23 +172,39 @@ app.get('/api/health', (req, res) => {
   }
 });
 
-// Direct root health endpoints
-app.get('/health', (req, res) => {
+// Direct root health & keep-alive endpoints (Fast, lightweight JSON for Uptime monitors & Render)
+app.get(['/health', '/ping'], (req, res) => {
   const { getTunnelStatus } = require('./services/tunnelService');
-  res.json({
+  res.status(200).json({
     status: 'ok',
-    uptime: formatUptime(process.uptime()),
+    pong: true,
+    message: 'Render 24/7 Keep-Alive Active',
+    uptime_seconds: Math.round(process.uptime()),
+    uptime_human: formatUptime(process.uptime()),
+    timestamp: new Date().toISOString(),
+    keepAlive: getKeepAliveStatus(),
     tunnel: getTunnelStatus()
   });
 });
 
-app.get('/ping', (req, res) => {
-  res.status(200).send('PONG');
+// Dedicated Keep-Alive info endpoint
+app.get('/api/keep-alive', (req, res) => {
+  res.json({
+    success: true,
+    keepAlive: getKeepAliveStatus()
+  });
 });
 
-// Lightweight ping for keepalive watchdog
-app.get('/api/health/ping', (req, res) => {
-  res.status(200).send('PONG');
+// Trigger a manual keep-alive ping on demand
+app.post('/api/keep-alive/ping', async (req, res) => {
+  const status = getKeepAliveStatus();
+  const target = req.body?.url || status.pingUrl;
+  const result = await pingTarget(target);
+  res.json({
+    success: result.success,
+    result,
+    keepAlive: getKeepAliveStatus()
+  });
 });
 
 // Dedicated Web Admin Panel page
@@ -212,6 +230,9 @@ server.listen(config.port, '0.0.0.0', () => {
   console.log(`🌐 Local Web:    http://localhost:${config.port}`);
   console.log(`📱 Mini App URL: ${config.miniAppUrl}`);
   console.log(`======================================================\n`);
+
+  // Start 24/7 Keep-Alive watchdog to keep Render awake continuously
+  startKeepAlive();
 
   // Start Telegram Bot
   const bot = initBot();

@@ -1,12 +1,98 @@
 const assert = require('assert');
 const path = require('path');
 const fs = require('fs');
-const db = require('../server/db');
+const Database = require('better-sqlite3');
 const { generateRoundRobinFixtures, calculateStandings } = require('../server/services/fixtureGenerator');
 const { analyzeMatchScreenshot } = require('../server/services/ocrService');
 
+// Create isolated in-memory test database so production DB is never modified
+const db = new Database(':memory:');
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS leagues (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    season TEXT NOT NULL,
+    participant_limit INTEGER NOT NULL DEFAULT 12,
+    unique_clubs INTEGER NOT NULL DEFAULT 0,
+    rules TEXT,
+    status TEXT NOT NULL DEFAULT 'registration',
+    current_round INTEGER NOT NULL DEFAULT 1,
+    total_rounds INTEGER NOT NULL DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS participants (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    league_id INTEGER NOT NULL,
+    telegram_id TEXT NOT NULL,
+    username TEXT,
+    first_name TEXT,
+    player_name TEXT NOT NULL,
+    club_name TEXT NOT NULL,
+    club_badge_color TEXT DEFAULT '#00e5ff',
+    avatar_url TEXT,
+    status TEXT NOT NULL DEFAULT 'active',
+    waitlist_order INTEGER DEFAULT 0,
+    registered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE CASCADE,
+    UNIQUE (league_id, telegram_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS matches (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    league_id INTEGER NOT NULL,
+    round INTEGER NOT NULL,
+    home_participant_id INTEGER NOT NULL,
+    away_participant_id INTEGER NOT NULL,
+    home_score INTEGER DEFAULT NULL,
+    away_score INTEGER DEFAULT NULL,
+    status TEXT NOT NULL DEFAULT 'scheduled',
+    scheduled_date TEXT,
+    uploader_participant_id INTEGER DEFAULT NULL,
+    screenshot_url TEXT DEFAULT NULL,
+    stats_json TEXT DEFAULT NULL,
+    ai_summary TEXT DEFAULT NULL,
+    home_confirmed INTEGER NOT NULL DEFAULT 0,
+    away_confirmed INTEGER NOT NULL DEFAULT 0,
+    dispute_reason TEXT DEFAULT NULL,
+    live_state_json TEXT DEFAULT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS predictions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    match_id INTEGER NOT NULL,
+    telegram_id TEXT NOT NULL,
+    predictor_name TEXT NOT NULL,
+    predicted_home INTEGER NOT NULL,
+    predicted_away INTEGER NOT NULL,
+    points_earned INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE,
+    UNIQUE (match_id, telegram_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS motw_votes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    league_id INTEGER NOT NULL,
+    round INTEGER NOT NULL,
+    match_id INTEGER NOT NULL,
+    telegram_id TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE,
+    UNIQUE (league_id, round, telegram_id)
+  );
+
+  INSERT INTO leagues (name, season, participant_limit, unique_clubs, status)
+  VALUES ('eFootball Uzbekistan Masters', '1-Mavsum (2026)', 12, 0, 'registration');
+`);
+
 console.log('🧪 ==========================================');
-console.log('🧪 eFootball League E2E Test Suite');
+console.log('🧪 eFootball League E2E Test Suite (Isolated Memory DB)');
 console.log('🧪 ==========================================\n');
 
 async function runTests() {
